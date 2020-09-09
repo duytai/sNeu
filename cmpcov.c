@@ -1,20 +1,43 @@
 // trace-pc-guard-cb.cc
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <ctype.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/types.h>
 
 #define u8 uint8_t
 #define u16 uint16_t
 #define u32 uint32_t
 #define u64 uint64_t
+#define s32 int32_t 
 
 #define cLGN "\x1b[1;92m"
 #define cRST "\x1b[0m"
+#define bSTOP "\x0f"
+#define RESET_G1 "\x1b)B"
+#define CURSOR_SHOW "\x1b[?25h"
+#define cLRD "\x1b[1;91m"
+#define cBRI "\x1b[1;97m"
 
 #define SAYF(x...) printf(x)
 #define OKF(x...) do { \
   SAYF(cLGN "[+] " cRST x); \
   SAYF(cRST "\n"); \
 } while (0)
+#define FATAL(x...) do { \
+    SAYF(bSTOP RESET_G1 CURSOR_SHOW cRST cLRD "\n[-] PROGRAM ABORT : " \
+         cBRI x); \
+    SAYF(cLRD "\n         Location : " cRST "%s(), %s:%u\n\n", \
+         __FUNCTION__, __FILE__, __LINE__); \
+    exit(1); \
+  } while (0)
+
 
 #define IGNORE(name) \
   void name {\
@@ -23,8 +46,25 @@
 
 #define COV(name, len, ty) \
   void name(ty arg1, ty arg2) {\
-    handle_cmp(arg1, arg2, len, __builtin_return_address(0)); \
+    handle_cmp(arg1, arg2, len, (size_t) __builtin_return_address(0)); \
   }
+
+#define FORMAT(_str...) ({ \
+    char * _tmp; \
+    s32 _len = snprintf(NULL, 0, _str); \
+    if (_len < 0) FATAL("snprintf() failed"); \
+    _tmp = malloc(_len + 1); \
+    snprintf(_tmp, _len + 1, _str); \
+    _tmp; \
+  })
+
+typedef struct {
+  u32 coverage;
+  char* coverage_dir;
+} AsanOptions;
+
+static AsanOptions asan_options = { .coverage = 0, .coverage_dir = "." };
+static u32 cur_fd;
 
 static u8 count_matching_bytes(u32 len, u64 x, u64 y) {
   u32 i;
@@ -36,10 +76,82 @@ static u8 count_matching_bytes(u32 len, u64 x, u64 y) {
   return i;
 }
 
-static void handle_cmp(u64 x, u64 y, u32 len, void* pc) {
-  u8 diff_bytes = len - count_matching_bytes(len, x, y);
-  OKF("diff: %d\n", diff_bytes);
+static char * trim_space(char *str) {
+  char *end;
+  while (isspace(*str)) {
+    str = str + 1;
+  }
+  end = str + strlen(str) - 1;
+  while (end > str && isspace(*end)) {
+    end = end - 1;
+  }
+  *(end+1) = '\0';
+  return str;
 }
+
+static void parse_asan_options() {
+  char* asan_options_str = getenv("ASAN_OPTIONS");
+  if (asan_options_str) {
+    char* token;
+    while ((token = strsep(&asan_options_str, ",")) != NULL) {
+      char* key = strsep(&token, "=");
+      char* value = strsep(&token, "=");
+      if (key != NULL && value != NULL) {
+        if (strcmp(trim_space(key), "coverage") == 0) {
+          asan_options.coverage = atoi(value);
+        }
+        if (strcmp(trim_space(key), "coverage_dir") == 0) {
+          asan_options.coverage_dir = trim_space(value);
+        }
+      }
+    }
+  }
+}
+
+static void prepare_files() {
+  struct stat st;
+  if (asan_options.coverage == 1) {
+    /* create directory */
+    if (stat(asan_options.coverage_dir, &st) == -1) {
+      mkdir(asan_options.coverage_dir, 0700);
+    }
+    /* write header */
+    char header[] = {0x64, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xBF, 0xC0};
+    char* fpath = FORMAT("%s/cmp.%d.sancov", asan_options.coverage_dir, getpid());
+    /* write header */
+    cur_fd = open(fpath, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+    if (cur_fd < 0) FATAL("open() failed");
+    s32 offset = lseek(cur_fd, 0, SEEK_END);
+    if (offset < 0) FATAL("lseek() failed");
+    /* empy file */
+    if (offset == 0) write(cur_fd, header, 8);
+    lseek(cur_fd, 0, SEEK_END);
+    free(fpath);
+  }
+}
+
+static void handle_cmp(u64 x, u64 y, u32 len, size_t pc) {
+  u8 diff_bytes = len - count_matching_bytes(len, x, y);
+  if (asan_options.coverage == 1) {
+    u8 data[] =  {0, 0, 0, 0, 0, 0, 0, 0, 0};
+    data[7] = diff_bytes;
+    data[0] = pc & 0xFF;
+    data[1] = (pc >> 8) & 0xFF;
+    data[2] = (pc >> 16) & 0xFF;
+    data[3] = (pc >> 24) & 0xFF;
+    write(cur_fd, data, 8);
+    OKF("Diff %d: %04zx", diff_bytes, pc);
+  }
+}
+
+__attribute__((constructor)) static void init() {
+  static u8 init_done;
+  if (!init_done) {
+    parse_asan_options();
+    prepare_files();
+    init_done = 1;
+  }
+};
 
 COV(__sanitizer_cov_trace_cmp1, 1, u8)
 COV(__sanitizer_cov_trace_cmp2, 2, u16)
