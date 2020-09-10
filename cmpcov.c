@@ -1,4 +1,3 @@
-// trace-pc-guard-cb.cc
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,9 +44,13 @@
   }
 
 #define COV(name, len, ty) \
-  void name(ty arg1, ty arg2) {\
-    handle_cmp(arg1, arg2, len, (size_t) __builtin_return_address(0)); \
+  void name(ty x, ty y) {\
+    fprintf(stdout, "%s\n", __func__); \
+    u8 diff_bytes = len - count_matching_bytes(len, x, y); \
+    sum_diff += diff_bytes; \
   }
+
+#define PC_COV(start, stop)\
 
 #define FORMAT(_str...) ({ \
     char * _tmp; \
@@ -65,6 +68,7 @@ typedef struct {
 
 static AsanOptions asan_options = { .coverage = 0, .coverage_dir = "." };
 static u32 cur_fd;
+static u8 sum_diff;
 
 static u8 count_matching_bytes(u32 len, u64 x, u64 y) {
   u32 i;
@@ -130,8 +134,7 @@ static void prepare_files() {
   }
 }
 
-static void handle_cmp(u64 x, u64 y, u32 len, size_t pc) {
-  u8 diff_bytes = len - count_matching_bytes(len, x, y);
+static void append_sancov(u32 pc, u8 diff_bytes) {
   if (asan_options.coverage == 1) {
     u8 data[] =  {0, 0, 0, 0, 0, 0, 0, 0, 0};
     data[7] = diff_bytes;
@@ -140,18 +143,25 @@ static void handle_cmp(u64 x, u64 y, u32 len, size_t pc) {
     data[2] = (pc >> 16) & 0xFF;
     data[3] = (pc >> 24) & 0xFF;
     write(cur_fd, data, 8);
-    OKF("Diff %d: %04zx", diff_bytes, pc);
+    OKF("Diff %d:%04x", diff_bytes, pc);
   }
 }
 
-__attribute__((constructor)) static void init() {
-  static u8 init_done;
-  if (!init_done) {
-    parse_asan_options();
-    prepare_files();
-    init_done = 1;
+void __sanitizer_cov_trace_pc_guard_init(u32 *start, u32 *stop) {
+  parse_asan_options();
+  prepare_files();
+  if (start == stop || *start) return;
+  while (start < stop) {
+    append_sancov((u32) start, 8);
+    start ++;
   }
-};
+}
+
+void __sanitizer_cov_trace_pc_guard(u32 *guard) {
+  append_sancov((u32) guard, sum_diff);
+  sum_diff = 0;
+}
+
 
 COV(__sanitizer_cov_trace_cmp1, 1, u8)
 COV(__sanitizer_cov_trace_cmp2, 2, u16)
@@ -166,5 +176,3 @@ IGNORE(__sanitizer_cov_trace_switch(u64 Val, u64 *Cases))
 IGNORE(__sanitizer_cov_trace_div4(u32 Val))
 IGNORE(__sanitizer_cov_trace_div8(u64 Val))
 IGNORE(__sanitizer_cov_trace_gep(uintptr_t Idx))
-IGNORE(__sanitizer_cov_trace_pc_guard_init(u32 *start, u32 *stop))
-IGNORE(__sanitizer_cov_trace_pc_guard(u32 *guard))
