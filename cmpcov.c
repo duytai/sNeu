@@ -129,7 +129,6 @@ static void prepare_files() {
     if (offset < 0) FATAL("lseek() failed");
     /* empy file */
     if (offset == 0) write(cur_fd, header, 8);
-    lseek(cur_fd, 0, SEEK_END);
     free(fpath);
   }
 }
