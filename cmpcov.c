@@ -155,6 +155,7 @@ void __sanitizer_cov_trace_pc_guard_init(u32 *start, u32 *stop) {
   parse_asan_options();
   prepare_files();
   if (start == stop || *start) return;
+  OKF("%s", __func__);
   while (start < stop) {
     append_sancov((u32) start, 8);
     start ++;
@@ -162,6 +163,7 @@ void __sanitizer_cov_trace_pc_guard_init(u32 *start, u32 *stop) {
 }
 
 void __sanitizer_cov_trace_pc_guard(u32 *guard) {
+  OKF("%s", __func__);
   append_sancov((u32) guard, sum_diff);
   sum_diff = 0;
 }
