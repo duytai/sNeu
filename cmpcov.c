@@ -26,6 +26,7 @@
 
 #define SAYF(x...) printf(x)
 #define OKF(x...) do { \
+  if (asan_options.debug != 1) break; \
   SAYF(cLGN "[+] " cRST x); \
   SAYF(cRST "\n"); \
 } while (0)
@@ -40,12 +41,12 @@
 
 #define IGNORE(name) \
   void name {\
-    fprintf(stdout, "%s\n", __func__); \
+    OKF("%s", __func__); \
   }
 
 #define COV(name, len, ty) \
   void name(ty x, ty y) {\
-    fprintf(stdout, "%s\n", __func__); \
+    OKF("%s", __func__); \
     u8 diff_bytes = len - count_matching_bytes(len, x, y); \
     sum_diff += diff_bytes; \
   }
@@ -63,10 +64,11 @@
 
 typedef struct {
   u32 coverage;
+  u32 debug;
   char* coverage_dir;
 } AsanOptions;
 
-static AsanOptions asan_options = { .coverage = 0, .coverage_dir = "." };
+static AsanOptions asan_options = { .coverage = 0, .coverage_dir = ".", .debug = 0 };
 static u32 cur_fd;
 static u8 sum_diff;
 
@@ -106,6 +108,9 @@ static void parse_asan_options() {
         }
         if (strcmp(trim_space(key), "coverage_dir") == 0) {
           asan_options.coverage_dir = trim_space(value);
+        }
+        if (strcmp(trim_space(key), "debug") == 0) {
+          asan_options.debug = atoi(value);
         }
       }
     }
