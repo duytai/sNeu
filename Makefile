@@ -4,9 +4,9 @@ CC=clang
 all: test
 
 test: libcmpcov.a libafl-llvm-rt.a test.c
-	$(CC) -c test.c -o test.o -fsanitize=address -fsanitize-coverage=trace-pc-guard,trace-cmp
+	$(CC) -c test.c -o test.o -fsanitize=address -fsanitize-coverage=trace-pc-guard,trace-cmp,no-prune
 	$(CC) test.o -o test -fsanitize=address -Wl,--whole-archive -L./ -lcmpcov -Wl,--no-whole-archive
-	$(CC) test.c -o asan -fsanitize=address -fsanitize-coverage=trace-pc-guard
+	$(CC) test.c -o asan -fsanitize=address -fsanitize-coverage=trace-pc-guard,no-prune
 
 %.o: %.c
 	$(CC) -c -o $@ $< -fPIE -Wno-pointer-sign
