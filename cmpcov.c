@@ -25,11 +25,13 @@
 #define cBRI "\x1b[1;97m"
 
 #define SAYF(x...) printf(x)
+
 #define OKF(x...) do { \
   if (asan_options.debug != 1) break; \
   SAYF(cLGN "[+] " cRST x); \
   SAYF(cRST "\n"); \
 } while (0)
+
 #define FATAL(x...) do { \
     SAYF(bSTOP RESET_G1 CURSOR_SHOW cRST cLRD "\n[-] PROGRAM ABORT : " \
          cBRI x); \
@@ -38,7 +40,6 @@
     exit(1); \
   } while (0)
 
-
 #define IGNORE(name) \
   void name {\
     OKF("%s", __func__); \
@@ -46,12 +47,9 @@
 
 #define COV(name, len, ty) \
   void name(ty x, ty y) {\
-    OKF("%s", __func__); \
-    u8 diff_bytes = len - count_matching_bytes(len, x, y); \
-    sum_diff += diff_bytes; \
+    u64 diff = x > y ? (u64)x - (u64)y : (u64)y - (u64)x;\
+    diff_value = diff > U32_MAX ? U32_MAX : diff;\
   }
-
-#define PC_COV(start, stop)\
 
 #define FORMAT(_str...) ({ \
     char * _tmp; \
@@ -62,6 +60,8 @@
     _tmp; \
   })
 
+#define U32_MAX 0xFFFFFFFF
+
 typedef struct {
   u32 coverage;
   u32 debug;
@@ -70,17 +70,7 @@ typedef struct {
 
 static AsanOptions asan_options = { .coverage = 0, .coverage_dir = ".", .debug = 0 };
 static u32 cur_fd;
-static u8 sum_diff;
-
-static u8 count_matching_bytes(u32 len, u64 x, u64 y) {
-  u32 i;
-  for (i = 0; i < len; i++) {
-    if (((x >> (i * 8)) & 0xff) != ((y >> (i * 8)) & 0xff)) {
-      break;
-    }
-  }
-  return i;
-}
+static u32 diff_value = U32_MAX;
 
 static char * trim_space(char *str) {
   char *end;
@@ -138,16 +128,20 @@ static void prepare_files() {
   }
 }
 
-static void append_sancov(u32 pc, u8 diff_bytes) {
+static void append_sancov(u32 pc, u32 diff_value) {
   if (asan_options.coverage == 1) {
     u8 data[] =  {0, 0, 0, 0, 0, 0, 0, 0, 0};
-    data[7] = diff_bytes;
     data[0] = pc & 0xFF;
     data[1] = (pc >> 8) & 0xFF;
     data[2] = (pc >> 16) & 0xFF;
     data[3] = (pc >> 24) & 0xFF;
+    //
+    data[4] = diff_value & 0xFF;
+    data[5] = (diff_value >> 8) & 0xFF;
+    data[6] = (diff_value >> 16) & 0xFF;
+    data[7] = (diff_value >> 24) & 0xFF;
+    // write
     write(cur_fd, data, 8);
-    OKF("Diff %d:%04x", diff_bytes, pc);
   }
 }
 
@@ -155,19 +149,16 @@ void __sanitizer_cov_trace_pc_guard_init(u32 *start, u32 *stop) {
   parse_asan_options();
   prepare_files();
   if (start == stop || *start) return;
-  OKF("%s", __func__);
   while (start < stop) {
-    append_sancov((u32) start, 8);
+    append_sancov((u32) start, diff_value);
     start ++;
   }
 }
 
 void __sanitizer_cov_trace_pc_guard(u32 *guard) {
-  OKF("%s", __func__);
-  append_sancov((u32) guard, sum_diff);
-  sum_diff = 0;
+  append_sancov((u32) guard, diff_value);
+  diff_value = 0;
 }
-
 
 COV(__sanitizer_cov_trace_cmp1, 1, u8)
 COV(__sanitizer_cov_trace_cmp2, 2, u16)
