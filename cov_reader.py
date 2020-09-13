@@ -22,5 +22,7 @@ if __name__ == '__main__':
                 print("[+] offset: %d" % offset)
                 print("[+] diff_value: %d" % diff_value)
                 coverage[offset] = diff_value
-            for offset, diff_value in coverage.items():
+            items = coverage.items()
+            for offset, diff_value in items:
                 print("[+] %d\t:\t%d" % (offset, diff_value))
+            print("[+] len %d" % len(items))
