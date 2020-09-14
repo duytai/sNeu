@@ -1,23 +1,20 @@
 AR=ar
 CC=clang
+CXX=clang++
 
 all: test
 
-test: libcmpcov.a libafl-llvm-rt.a test.c
-	$(CC) -c test.c -o test.o -fsanitize=address -fsanitize-coverage=trace-pc-guard,trace-cmp,no-prune
-	$(CC) test.o -o test -fsanitize=address -Wl,--whole-archive -L./ -lcmpcov -Wl,--no-whole-archive
-	$(CC) test.c -o asan -fsanitize=address -fsanitize-coverage=trace-pc-guard,no-prune
+libcmppass.so: cmppass.cpp
+	$(CXX) -shared -o $@ -fPIC $<
 
 %.o: %.c
-	$(CC) -c -o $@ $< -fPIE -Wno-pointer-sign
+	$(CC) -c -o $@ $<
 
-libcmpcov.a: cmpcov.o 
+libcmpcov.a: cmpcov.o
 	$(AR) cr $@ cmpcov.o
 
-libafl-llvm-rt.a: afl-llvm-rt.o
-	$(AR) cr $@ afl-llvm-rt.o
+test: libcmppass.so libcmpcov.a
+	$(CC) -Xclang -load -Xclang ./libcmppass.* $@.c -L./ -lcmpcov -o $@
 
 clean:
-	rm -f *.o test asan
-	rm -f libcmpcov.a libafl-llvm-rt.a
-	rm -rf logs/
+	rm -f *.so *.o *.a test
