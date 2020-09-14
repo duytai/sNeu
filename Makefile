@@ -16,6 +16,9 @@ libcmppass.so: cmppass.cpp
 libcmpcov.a: cmpcov.o
 	$(AR) cr $@ cmpcov.o
 
+libafl-llvm-rt.a: afl-llvm-rt.o
+	$(AR) cr $@ afl-llvm-rt.o
+
 test: libcmppass.so libcmpcov.a
 	$(CC) -c $@.c -o $@.o $(CFLAGS)
 	$(CC) $@.o -o $@ $(LDFLAGS)
