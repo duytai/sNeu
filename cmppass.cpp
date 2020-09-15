@@ -11,11 +11,11 @@
 using namespace llvm;
 
 namespace {
-  struct SkeletonPass : public ModulePass {
+  struct CmpPass : public ModulePass {
     static char ID;
     LLVMContext *C;
     const DataLayout *DL;
-    SkeletonPass() : ModulePass(ID) {}
+    CmpPass() : ModulePass(ID) {}
 
     bool runOnModule(Module& M) override {
       C = &(M.getContext());
@@ -80,16 +80,16 @@ namespace {
   };
 }
 
-char SkeletonPass::ID = 0;
+char CmpPass::ID = 0;
 
-static void registerSkeletonPass(
+static void registerCmpPass(
   const PassManagerBuilder &,
   legacy::PassManagerBase &PM
 ) {
-  PM.add(new SkeletonPass());
+  PM.add(new CmpPass());
 }
 
 static RegisterStandardPasses RegisterMyPass(
   PassManagerBuilder::EP_EnabledOnOptLevel0,
-  registerSkeletonPass
+  registerCmpPass
 );
