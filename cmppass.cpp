@@ -88,8 +88,8 @@ static void registerCmpPass(
 ) {
   PM.add(new CmpPass());
 }
+static RegisterStandardPasses RegisterCmpPass(
+  PassManagerBuilder::EP_ModuleOptimizerEarly, registerCmpPass);
 
-static RegisterStandardPasses RegisterMyPass(
-  PassManagerBuilder::EP_EnabledOnOptLevel0,
-  registerCmpPass
-);
+static RegisterStandardPasses RegisterCmpPass0(
+  PassManagerBuilder::EP_EnabledOnOptLevel0, registerCmpPass);
