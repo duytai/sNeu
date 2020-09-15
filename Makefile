@@ -3,7 +3,7 @@ CC=clang
 CXX=clang++
 
 CFLAGS=-Xclang -load -Xclang ./libcmppass.so
-LDFLAGS=-L./ -lcmpcov
+LDFLAGS=
 
 all: test
 
@@ -13,15 +13,12 @@ all: test
 libcmppass.so: cmppass.cpp
 	$(CXX) -shared -o $@ -fPIC $<
 
-libcmpcov.a: cmpcov.o
-	$(AR) cr $@ cmpcov.o
-
 libafl-llvm-rt.a: afl-llvm-rt.o
 	$(AR) cr $@ afl-llvm-rt.o
 
-test: libcmppass.so libcmpcov.a
+test: libcmppass.so cmpcov.o
 	$(CC) -c $@.c -o $@.o $(CFLAGS)
-	$(CC) $@.o -o $@ $(LDFLAGS)
+	$(CC) $@.o cmpcov.o -o $@ $(LDFLAGS)
 
 clean:
 	rm -f *.so *.o *.a test
