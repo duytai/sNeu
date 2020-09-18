@@ -7,15 +7,41 @@
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include <stdio.h>
 
 using namespace llvm;
+
+#define u32 uint32_t
+#define i32 int32_t
+#define u8  uint8_t
+
+#define cLGN "\x1b[1;92m"
+#define cRST "\x1b[0m"
+#define bSTOP "\x0f"
+#define RESET_G1 "\x1b)B"
+#define CURSOR_SHOW "\x1b[?25h"
+#define cLRD "\x1b[1;91m"
+#define cBRI "\x1b[1;97m"
+
+#define SAYF(x...) printf(x)
+
+#define FATAL(x...) do { \
+  SAYF(bSTOP RESET_G1 CURSOR_SHOW cRST cLRD "\n[-] PROGRAM ABORT : " \
+      cBRI x); \
+  SAYF(cLRD "\n         Location : " cRST "%s(), %s:%u\n\n", \
+      __FUNCTION__, __FILE__, __LINE__); \
+  exit(1); \
+} while (0)
+
 
 namespace {
   struct CmpPass : public ModulePass {
     static char ID;
     LLVMContext *C;
     const DataLayout *DL;
-    CmpPass() : ModulePass(ID) {}
+
+    CmpPass() : ModulePass(ID) {
+    }
 
     bool runOnModule(Module& M) override {
       C = &(M.getContext());
@@ -38,7 +64,7 @@ namespace {
         Int64Ty 
       );
 
-      uint32_t cmpIdx = 0;
+      u32 cmpIdx = 0;
 
       for (auto &F: M) {
         for (auto &BB: F) {
@@ -51,7 +77,7 @@ namespace {
                   Value *A0 = ICMP->getOperand(0);
                   Value *A1 = ICMP->getOperand(1);
                   if (!A0->getType()->isIntegerTy()) continue;
-                  uint8_t TypeSize = DL->getTypeStoreSizeInBits(A0->getType());
+                  u8 TypeSize = DL->getTypeStoreSizeInBits(A0->getType());
                   if (TypeSize > 64) continue;
                   bool FirstIsConst = isa<ConstantInt>(A0);
                   bool SecondIsConst = isa<ConstantInt>(A1);
