@@ -13,17 +13,12 @@ f_clang = "/usr/bin/clang"
 
 # read and modify flags 
 argv = sys.argv[1:]
-for idx, opt in enumerate(argv):
-    if opt == "-c":
-        # instrument c file
-        argv = argv + ["-Xclang", "-load", "-Xclang", f_libcmppass]
-        break
-    if opt == "-o":
-        out_file = argv[idx + 1].strip()
-        if not out_file.endswith(".o"):
-            # inject handler 
-            argv = argv + [f_cmp]
-        break
+cwd = os.getcwd()
+
+if "-c" in argv:
+    argv = argv + ["-Xclang", "-load", "-Xclang", f_libcmppass]
+elif "-o" in argv:
+    argv = argv + [f_cmp]
 
 # forward to clang
 env = os.environ.copy()
