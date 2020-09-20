@@ -7,12 +7,15 @@
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/IR/DebugInfoMetadata.h"
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
 using namespace llvm;
 
 #define u32 uint32_t
-#define i32 int32_t
+#define s32 int32_t
 #define u8  uint8_t
 
 #define cLGN "\x1b[1;92m"
@@ -33,6 +36,16 @@ using namespace llvm;
   exit(1); \
 } while (0)
 
+#define FORMAT(_str...) ({ \
+  char * _tmp; \
+  s32 _len = snprintf(NULL, 0, _str); \
+  if (_len < 0) FATAL("snprintf() failed"); \
+  _tmp = (char*) malloc(_len + 1); \
+  snprintf(_tmp, _len + 1, _str); \
+  _tmp; \
+})
+
+#define TMP_FILE "/tmp/cmp_stats"
 
 namespace {
   struct CmpPass : public ModulePass {
@@ -40,10 +53,15 @@ namespace {
     LLVMContext *C;
     const DataLayout *DL;
 
-    CmpPass() : ModulePass(ID) {
-    }
+    CmpPass() : ModulePass(ID) {}
 
     bool runOnModule(Module& M) override {
+
+      FILE* FilePtr = NULL;
+      char* LinePtr = NULL;
+      size_t Len = 0;
+      u32 From = 0, Size = 0, ShouldAppend = 0;
+
       C = &(M.getContext());
       DL = &M.getDataLayout();
       AttributeList SanCovTraceCmpZeroExtAL;
@@ -64,7 +82,26 @@ namespace {
         Int64Ty 
       );
 
-      u32 cmpIdx = 0;
+      FilePtr = fopen(TMP_FILE, "a+");
+      if (FilePtr == NULL) FATAL("fopen() failed");
+      const char* CurId = M.getModuleIdentifier().c_str();
+
+      while(1) {
+        if (getline(&LinePtr, &Len, FilePtr) != -1) {
+          const char* Id = strsep(&LinePtr, ":");
+          From = atoi(strsep(&LinePtr, ":"));
+          Size = atoi(strsep(&LinePtr, ":"));
+          if (strcmp(Id, CurId) == 0) {
+            Size = 0;
+            break;
+          };
+        } else {
+          From = From + Size;
+          Size = 0;
+          ShouldAppend = 1;
+          break;
+        }
+      }
 
       for (auto &F: M) {
         for (auto &BB: F) {
@@ -87,11 +124,11 @@ namespace {
                     auto Ty = Type::getIntNTy(*C, TypeSize);
                     IRB.CreateCall(CallbackFunc, {
                       ConstantInt::get(Ty, TypeSize),
-                      ConstantInt::get(Ty, cmpIdx),
+                      ConstantInt::get(Ty, From + Size),
                       IRB.CreateIntCast(A0, Ty, true),
                       IRB.CreateIntCast(A1, Ty, true)
                     });
-                    cmpIdx = cmpIdx + 1;
+                    Size = Size + 1;
                   }
                 }
               }
@@ -99,7 +136,24 @@ namespace {
           }
         }
       }
-      outs() << "cmpIdx: " << cmpIdx << "\n";
+
+      /* readelf -s file to get boundary */
+      auto VarName = FORMAT("__sn_%d_%d", From, Size);
+      new GlobalVariable(
+        M,
+        Int64Ty,
+        false,
+        GlobalValue::CommonLinkage,
+        ConstantInt::get(Int64Ty, 0),
+        VarName
+      );
+
+      /* append to file */
+      if (ShouldAppend) {
+        LinePtr = FORMAT("%s:%d:%d\n", CurId, From, Size);
+        fwrite(LinePtr, 1, strlen(LinePtr), FilePtr);
+        fclose(FilePtr);
+      }
 
       return false;
     }

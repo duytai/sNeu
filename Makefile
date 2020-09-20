@@ -14,7 +14,7 @@ libafl-llvm-rt.a: afl-llvm-rt.o
 	$(AR) cr $@ afl-llvm-rt.o
 
 test: libcmppass.so cmpcov.o
-	./clang.py -c $@.c -o $@.o
+	./clang.py -c -g $@.c -o $@.o
 	./clang.py $@.o -o $@
 
 clean:

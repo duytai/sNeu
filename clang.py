@@ -20,6 +20,9 @@ if "-c" in argv:
 elif "-o" in argv:
     argv = argv + [f_cmp]
 
+# absoulte path for .c file
+argv = [os.path.join(cwd, x) if x.endswith(".c") else x for x in argv]
+
 # forward to clang
 env = os.environ.copy()
 argv = [f_clang] + argv 
