@@ -7,9 +7,9 @@ import os
 from subprocess import Popen, PIPE
 
 # TODO: read from env
-f_libcmppass = "/root/compare-coverage/libcmppass.so"
-f_cmp = "/root/compare-coverage/cmpcov.o"
-f_clang = "/usr/bin/clang"
+pwd = os.path.dirname(os.path.realpath(__file__))
+f_libcmppass = os.path.join(pwd, "libcmppass.so")
+f_cmp = os.path.join(pwd, "cmpcov.o")
 
 # read and modify flags 
 argv = sys.argv[1:]
@@ -25,7 +25,7 @@ argv = [os.path.join(cwd, x) if x.endswith(".c") else x for x in argv]
 
 # forward to clang
 env = os.environ.copy()
-argv = [f_clang] + argv 
+argv = ["clang"] + argv 
 p = Popen(argv, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env)
 out, err = p.communicate()
 
