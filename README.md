@@ -1,17 +1,15 @@
 # c-branch-distance
 
-This is a simple instrument module for c/c++ and rust programs. It summarizes branch distances and save them to disk in the form
-of standard `.sancov` files. It is based on [SanitizerCoverage](https://clang.llvm.org/docs/SanitizerCoverage.html)
+This is a simple instrument module for c/c++. It sums up branch distances and save them to disk
 
 ### 1. How does it work
 
-It sumarizes distances in `cmp` instructions and write them to `.sancov` when `__sanitizer_cov_trace_pc_guard` is invoked.
-The branch distance of each `cmp` instruction is `8 - matching bytes between two operands`
+It instruments a `.c` file with LLVM Pass `libcmppass.so` and adds a function call `__sn_cmp` to each comparison instruction followed by a conditional `JUMP`. Each comparison instruction has a unique ID. The function `__sn_cmp` is implemented in `cmpcov.c` file where we save branch distances to `.logs/<pid>.cov` file. 
+
+- `cov_reader.py` is an example of reading, accumulating and generating traning label
+- `clang.py` is a wrapper of `clang`. It replaces original `clang` to build `c/c++` project without editing `Makefile` or `CMakeLists`
+
 
 ### 2. Usage
-
-```bash
-make
-ASAN_OPTIONS="coverage=1, coverage_dir=logs/" ./test
-```
-It writes coverage to `.sancov` located at `logs/`.
+- `make` to generate `libcmppass.so` and `cmpcov.o`
+- update clang wrapper to `CC` flag, e.g., `CC=path_to_clang.py` and build your project
