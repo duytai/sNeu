@@ -55,9 +55,9 @@
  * */
 static FILE* cov_file = NULL;
 
-void __sn_cmp(u8 type_size, u32 branch_id, u64 left_value, u64 right_value) {
+void __sn_cmp(u8 type_size, u64 branch_id, u64 left_value, u64 right_value) {
   fwrite(to_bytes(1, type_size), 1, 1, cov_file);
-  fwrite(to_bytes(4, branch_id), 4, 1, cov_file);
+  fwrite(to_bytes(8, branch_id), 8, 1, cov_file);
   fwrite(to_bytes(8, left_value), 8, 1, cov_file);
   fwrite(to_bytes(8, right_value), 8, 1, cov_file);
 }

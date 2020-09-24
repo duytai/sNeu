@@ -14,6 +14,7 @@
 
 using namespace llvm;
 
+#define u64 uint64_t
 #define u32 uint32_t
 #define s32 int32_t
 #define u8  uint8_t
@@ -45,8 +46,6 @@ using namespace llvm;
   _tmp; \
 })
 
-#define TMP_FILE "/tmp/cmp_stats"
-
 namespace {
   struct CmpPass : public ModulePass {
     static char ID;
@@ -57,10 +56,7 @@ namespace {
 
     bool runOnModule(Module& M) override {
 
-      FILE* FilePtr = NULL;
-      char* LinePtr = NULL;
-      size_t Len = 0;
-      u32 From = 0, Size = 0, ShouldAppend = 0;
+      u64 From = 0, Size = 0;
 
       C = &(M.getContext());
       DL = &M.getDataLayout();
@@ -69,7 +65,6 @@ namespace {
       IRBuilder<> IRB(*C);
 
       Type* Int8Ty = IRB.getInt8Ty();
-      Type* Int32Ty = IRB.getInt32Ty();
       Type* Int64Ty = IRB.getInt64Ty();
 
       FunctionCallee CallbackFunc = M.getOrInsertFunction(
@@ -77,31 +72,17 @@ namespace {
         SanCovTraceCmpZeroExtAL,
         VoidTy,
         Int8Ty,
-        Int32Ty,
+        Int64Ty,
         Int64Ty,
         Int64Ty 
       );
 
-      FilePtr = fopen(TMP_FILE, "a+");
-      if (FilePtr == NULL) FATAL("fopen() failed");
-      const char* CurId = M.getModuleIdentifier().c_str();
-
-      while(1) {
-        if (getline(&LinePtr, &Len, FilePtr) != -1) {
-          const char* Id = strsep(&LinePtr, ":");
-          From = atoi(strsep(&LinePtr, ":"));
-          Size = atoi(strsep(&LinePtr, ":"));
-          if (strcmp(Id, CurId) == 0) {
-            Size = 0;
-            break;
-          };
-        } else {
-          From = From + Size;
-          Size = 0;
-          ShouldAppend = 1;
-          break;
-        }
-      }
+      llvm::MD5 md5;
+      llvm::MD5::MD5Result Result;
+      md5.update(M.getModuleIdentifier());
+      md5.final(Result);
+      for (auto I = 0; I < 8; ++ I)
+        From |= static_cast<uint64_t>(Result[I]) << (I * 8);
 
       for (auto &F: M) {
         for (auto &BB: F) {
@@ -123,8 +104,8 @@ namespace {
                     if (SecondIsConst) std::swap(A0, A1);
                     auto Ty = Type::getIntNTy(*C, TypeSize);
                     IRB.CreateCall(CallbackFunc, {
-                      ConstantInt::get(Ty, TypeSize),
-                      ConstantInt::get(Ty, From + Size),
+                      ConstantInt::get(Int8Ty, TypeSize),
+                      ConstantInt::get(Int64Ty, From + Size),
                       IRB.CreateIntCast(A0, Ty, true),
                       IRB.CreateIntCast(A1, Ty, true)
                     });
@@ -138,7 +119,7 @@ namespace {
       }
 
       /* readelf -s file to get boundary */
-      auto VarName = FORMAT("__sn_%d_%d", From, Size);
+      auto VarName = FORMAT("__sn_%lu_%lu", From, Size);
       new GlobalVariable(
         M,
         Int64Ty,
@@ -147,13 +128,6 @@ namespace {
         ConstantInt::get(Int64Ty, 0),
         VarName
       );
-
-      /* append to file */
-      if (ShouldAppend) {
-        LinePtr = FORMAT("%s:%d:%d\n", CurId, From, Size);
-        fwrite(LinePtr, 1, strlen(LinePtr), FilePtr);
-        fclose(FilePtr);
-      }
 
       return false;
     }

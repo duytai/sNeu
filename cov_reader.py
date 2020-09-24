@@ -13,7 +13,7 @@ if __name__ == '__main__':
     ## extract total number of comparison instructions 
     my_env = os.environ.copy()
     process = subprocess.Popen(
-        ["readelf", "-s", test_bin],
+        ["strings", test_bin],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -46,11 +46,12 @@ if __name__ == '__main__':
     data = open(cov_file, "rb").read()
 
     label = [0] * len(branches)
-    for i in range(0, len(data), 21):
+    print(branches)
+    for i in range(0, len(data), 25):
         type_size = struct.unpack("<B", data[i : i + 1])[0]
-        branch_id = struct.unpack("<I", data[i + 1 : i + 5])[0]
-        left_value = struct.unpack("<Q", data[i + 5 : i + 13])[0]
-        right_value = struct.unpack("<Q", data[i + 13 : i + 21])[0]
+        branch_id = struct.unpack("<Q", data[i + 1 : i + 9])[0]
+        left_value = struct.unpack("<Q", data[i + 9 : i + 17])[0]
+        right_value = struct.unpack("<Q", data[i + 17 : i + 25])[0]
         distance = left_value - right_value
         label[branches.index(branch_id)] += distance
     os.remove(cov_file)
