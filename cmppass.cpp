@@ -69,7 +69,7 @@ namespace {
       IRBuilder<> IRB(*C);
 
       Type* Int8Ty = IRB.getInt8Ty();
-      Type* Int16Ty = IRB.getInt16Ty();
+      Type* Int32Ty = IRB.getInt32Ty();
       Type* Int64Ty = IRB.getInt64Ty();
 
       FunctionCallee CallbackFunc = M.getOrInsertFunction(
@@ -77,7 +77,7 @@ namespace {
         SanCovTraceCmpZeroExtAL,
         VoidTy,
         Int8Ty,
-        Int16Ty,
+        Int32Ty,
         Int64Ty,
         Int64Ty 
       );
