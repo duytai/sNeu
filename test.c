@@ -3,25 +3,23 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+void func(int x) {
+  if (x > 8989) {
+    printf("f\n");
+  }
+}
+
 int main(int argc, char **argv) {
-  char* dict[] = {"hello", "world", "11", "22", "33"};
-  uint8_t bytes[] = {1,2,3,4,4,4,4,4,4 };
-  if (argc < 10) {
-    for (int i = 0; i < 10; i++) {
-      if (rand() % 5 == 1) {
-        fprintf(stdout, "hit 5\n");
-      };
-      if (rand() % 7 == 1) {
-        fprintf(stdout, "hit 7\n");
-      };
-      if (strcmp(dict[rand() % 5], "11")) {
-        fprintf(stdout, "hit 11\n");
-      }
-      if (bytes[rand() % 9] == 99) {
-        fprintf(stdout, "hit 99\n");
-      }
+  if (argc < 230) {
+    if (argc > 0) {
+      printf("Hello \n");
     }
   }
-  fprintf(stdout, "argv[0] = %s\n", argv[0]);
+  if (argc > 100) {
+    if (argc < 1000) {
+      printf("World\n");
+    }
+  }
+  func(88888);
   return 0;
 }

@@ -8,9 +8,12 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/IR/DebugInfoMetadata.h"
+#include "llvm/IR/InstrTypes.h"
+#include "llvm/IR/Dominators.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sstream>
 
 using namespace llvm;
 
@@ -37,15 +40,6 @@ using namespace llvm;
   exit(1); \
 } while (0)
 
-#define FORMAT(_str...) ({ \
-  char * _tmp; \
-  s32 _len = snprintf(NULL, 0, _str); \
-  if (_len < 0) FATAL("snprintf() failed"); \
-  _tmp = (char*) malloc(_len + 1); \
-  snprintf(_tmp, _len + 1, _str); \
-  _tmp; \
-})
-
 namespace {
   struct CmpPass : public ModulePass {
     static char ID;
@@ -54,9 +48,35 @@ namespace {
 
     CmpPass() : ModulePass(ID) {}
 
+    void getAnalysisUsage(AnalysisUsage &AU) const override {
+			ModulePass::getAnalysisUsage(AU);
+			AU.addRequired<DominatorTreeWrapperPass>();
+		}
+
+    virtual StringRef getPassName() const override {
+			return "Pass To Collect Branch Distances";
+		}
+
+    std::string getFunctionSignature(Function* F)  {
+      std::stringstream Str;
+      Str << F->getName().data() << ":" << F->arg_size();
+      return Str.str();
+    }
+
+    u64 createUniqId(StringRef str) {
+      u64 UniqId = 0;
+      llvm::MD5 md5;
+      llvm::MD5::MD5Result Result;
+      md5.update(str);
+      md5.final(Result);
+      for (auto I = 0; I < 8; ++ I)
+        UniqId |= static_cast<u64>(Result[I]) << (I * 8);
+      return UniqId;
+    }
+
     bool runOnModule(Module& M) override {
 
-      u64 From = 0, Size = 0;
+      u64 From = createUniqId(M.getModuleIdentifier());
 
       C = &(M.getContext());
       DL = &M.getDataLayout();
@@ -77,58 +97,82 @@ namespace {
         Int64Ty 
       );
 
-      llvm::MD5 md5;
-      llvm::MD5::MD5Result Result;
-      md5.update(M.getModuleIdentifier());
-      md5.final(Result);
-      for (auto I = 0; I < 8; ++ I)
-        From |= static_cast<uint64_t>(Result[I]) << (I * 8);
-
       for (auto &F: M) {
-        for (auto &BB: F) {
-          for (auto &Inst: BB) {
-            if (CmpInst * ICMP = dyn_cast<CmpInst>(&Inst)) {
-              Instruction *nextInst = Inst.getNextNode();
-              if (BranchInst *BR = dyn_cast<BranchInst>(nextInst)) {
-                if (BR->isConditional()) {
-                  IRBuilder<> IRB(ICMP);
-                  Value *A0 = ICMP->getOperand(0);
-                  Value *A1 = ICMP->getOperand(1);
-                  if (!A0->getType()->isIntegerTy()) continue;
-                  u8 TypeSize = DL->getTypeStoreSizeInBits(A0->getType());
-                  if (TypeSize > 64) continue;
-                  bool FirstIsConst = isa<ConstantInt>(A0);
-                  bool SecondIsConst = isa<ConstantInt>(A1);
-                  if (FirstIsConst && SecondIsConst) continue;
-                  if (FirstIsConst || SecondIsConst) {
-                    if (SecondIsConst) std::swap(A0, A1);
-                    auto Ty = Type::getIntNTy(*C, TypeSize);
-                    IRB.CreateCall(CallbackFunc, {
-                      ConstantInt::get(Int8Ty, TypeSize),
-                      ConstantInt::get(Int64Ty, From + Size),
-                      IRB.CreateIntCast(A0, Ty, true),
-                      IRB.CreateIntCast(A1, Ty, true)
-                    });
-                    Size = Size + 1;
+        if (!F.empty()) {
+          std::string FSig = getFunctionSignature(&F);
+          DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>(F).getDomTree();
+          std::vector<std::pair<DomTreeNode*, u64>> Stack;
+          auto Item = std::pair<DomTreeNode*, u64>(DT.getRootNode(), From);
+          Stack.push_back(Item);
+          while (Stack.size()) {
+            auto Node = Stack.back().first;
+            auto Parent = Stack.back().second;
+            Stack.pop_back();
+            BasicBlock *BB = Node->getBlock();
+            for (auto &Inst: *BB) {
+              if (CallInst* CALL = dyn_cast<CallInst>(&Inst)) {
+                Function* CalledFunction = CALL->getCalledFunction();
+                if (CalledFunction) {
+                  if (!CalledFunction->isIntrinsic()) {
+                    auto CSig = getFunctionSignature(CalledFunction);
+                    std::stringstream VarName;
+                    VarName << "__sn_(" << FSig << ")_(" << CSig << ")_" << From;
+                    new GlobalVariable(
+                      M,
+                      Int64Ty,
+                      false,
+                      GlobalValue::CommonLinkage,
+                      ConstantInt::get(Int64Ty, 0),
+                      VarName.str()
+                    );
+                  }
+                }
+              }
+              if (CmpInst * ICMP = dyn_cast<CmpInst>(&Inst)) {
+                Instruction *nextInst = Inst.getNextNode();
+                if (BranchInst *BR = dyn_cast<BranchInst>(nextInst)) {
+                  if (BR->isConditional()) {
+                    IRBuilder<> IRB(ICMP);
+                    Value *A0 = ICMP->getOperand(0);
+                    Value *A1 = ICMP->getOperand(1);
+                    if (!A0->getType()->isIntegerTy()) continue;
+                    u8 TypeSize = DL->getTypeStoreSizeInBits(A0->getType());
+                    if (TypeSize > 64) continue;
+                    bool FirstIsConst = isa<ConstantInt>(A0);
+                    bool SecondIsConst = isa<ConstantInt>(A1);
+                    if (FirstIsConst && SecondIsConst) continue;
+                    if (FirstIsConst || SecondIsConst) {
+                      if (SecondIsConst) std::swap(A0, A1);
+                      auto Ty = Type::getIntNTy(*C, TypeSize);
+                      IRB.CreateCall(CallbackFunc, {
+                        ConstantInt::get(Int8Ty, TypeSize),
+                        ConstantInt::get(Int64Ty, From + 1),
+                        IRB.CreateIntCast(A0, Ty, true),
+                        IRB.CreateIntCast(A1, Ty, true)
+                      });
+                      std::stringstream VarName;
+                      VarName << "__sn_(" << FSig << ")_" << Parent << "_" << From + 1 ;
+                      new GlobalVariable(
+                        M,
+                        Int64Ty,
+                        false,
+                        GlobalValue::CommonLinkage,
+                        ConstantInt::get(Int64Ty, 0),
+                        VarName.str()
+                      );
+                      From = From + 1;
+                    }
                   }
                 }
               }
             }
+            for (auto Child: *Node) {
+              auto Item = std::pair<DomTreeNode*, u64>(Child, From);
+              Stack.push_back(Item);
+            }
           }
         }
       }
-
-      /* readelf -s file to get boundary */
-      auto VarName = FORMAT("__sn_%lu_%lu", From, Size);
-      new GlobalVariable(
-        M,
-        Int64Ty,
-        false,
-        GlobalValue::CommonLinkage,
-        ConstantInt::get(Int64Ty, 0),
-        VarName
-      );
-
       return false;
     }
   };
