@@ -67,7 +67,7 @@
     fwrite(BYTES(4, pc), 4, 1, cov_file);\
     fwrite(BYTES(8, left), 8, 1, cov_file);\
     fwrite(BYTES(8, right), 8, 1, cov_file);\
-    printf("%s:%d: %lu - %lu\n", __func__, pc, left, right);\
+    OKF("%s:%d: %lu - %lu", __func__, pc, left, right);\
   }
 
 #define LOG_DIR ".logs"
@@ -87,6 +87,9 @@ IGNORE(__sanitizer_cov_trace_switch(u64 Val, u64 *Cases))
 IGNORE(__sanitizer_cov_trace_div4(u32 Val))
 IGNORE(__sanitizer_cov_trace_div8(u64 Val))
 IGNORE(__sanitizer_cov_trace_gep(uintptr_t Idx))
+
+IGNORE(__sanitizer_cov_trace_pc_guard_init(u32* start, u32* stop))
+IGNORE(__sanitizer_cov_trace_pc_guard(u32* guard))
 
 __attribute__((constructor)) static void init() {
   static u8 init_done;
