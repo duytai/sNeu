@@ -5,10 +5,13 @@ all: test
 %.o: %.c
 	$(CC) -c -o $@ $< -fPIE -Wno-pointer-sign
 
-libcmpcov.a: cmpcov.o
+libcmpcov.a: cmpcov.o 
 	$(AR) cr $@ $^
 
-test: libcmpcov.a test.c
+libllvmrt.a: llvmrt.o
+	$(AR) cr $@ $^
+
+test: libcmpcov.a libllvmrt.a test.c
 	./clang.py -c -g $@.c -o $@.o
 	./clang.py $@.o -o $@
 
