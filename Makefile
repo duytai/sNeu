@@ -1,6 +1,4 @@
-AR=ar
 CC=clang
-CFLAGS=-fsanitize-coverage=trace-cmp
 
 all: test
 
@@ -8,8 +6,8 @@ all: test
 	$(CC) -c -o $@ $<
 
 test: cmpcov.o test.c
-	$(CC) -c -g $@.c -o $@.o $(CFLAGS)
-	$(CC) $@.o -o $@ cmpcov.o
+	./clang.py -c -g $@.c -o $@.o
+	./clang.py $@.o -o $@
 
 clean:
 	rm -f *.so *.o *.a test
