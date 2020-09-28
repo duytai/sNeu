@@ -3,23 +3,15 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-void func(int x) {
-  if (x > 8989) {
-    printf("");
-  }
-}
-
 int main(int argc, char **argv) {
-  if (argc < 230) {
-    if (argc > 0) {
-      printf("");
-    }
-  }
-  if (argc > 100) {
-    if (argc < 1000) {
-      printf("");
-    }
-  }
-  func(88888);
+  char data[44] = { /* zero padding */ };
+  fread(data, 1, sizeof(data) - 1, stdin);
+  if (data[0] != 'q') return 1;
+  if (data[1] != 'w') return 1;
+  if (data[2] != 'e') return 1;
+  if (data[3] != 'r') return 1;
+  if (data[4] != 't') return 1;
+  if (data[5] != 'y') return 1;
+  abort();
   return 0;
 }
