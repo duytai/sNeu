@@ -18,6 +18,7 @@ argv = sys.argv[1:]
     #  f.close()
 
 argv = ["rustc"] + argv + lib + [
+    "-C", "relocation-model=static",
     "-C", "passes=sancov",
     "-C", "llvm-args=-sanitizer-coverage-level=3",
     "-C", "llvm-args=-sanitizer-coverage-prune-blocks=0",

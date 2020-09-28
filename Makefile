@@ -3,7 +3,7 @@ CC=clang
 all: test
 
 %.o: %.c
-	$(CC) -c -o $@ $< -fPIE -Wno-pointer-sign
+	$(CC) -c -o $@ $< -Wno-pointer-sign
 
 libcmpcov.a: cmpcov.o 
 	$(AR) cr $@ $^
