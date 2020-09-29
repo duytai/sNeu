@@ -16,4 +16,4 @@ test: libcmpcov.a libllvmrt.a test.c
 	./clang.py $@.o -o $@
 
 clean:
-	rm -f *.so *.o *.a test
+	rm -f *.so *.o *.a fuzzer
