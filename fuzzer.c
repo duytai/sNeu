@@ -36,8 +36,8 @@ static int forksrv_pid, fsrv_st_fd, fsrv_ctl_fd, shm_id, child_pid = -1;
 static int out_fd, dev_null_fd, child_timed_out, total_execs;
 static uint8_t* trace_bits;
 static uint8_t virgin_bits[MAP_SIZE];
-static char* target_path = "example/target/debug/example";
-static char* in_dir = "example/out/queue";
+static char* target_path = NULL;
+static char* in_dir = NULL;
 
 static void fatal(char* msg) {
   fprintf(stderr, "%s", msg);
@@ -83,7 +83,7 @@ static void setup_signal_handlers() {
   sigaction(SIGALRM, &sa, NULL);
 }
 
-static void init_forkserver(char* target_path) {
+static void init_forkserver() {
   static struct itimerval it;
   int st_pipe[2], ctl_pipe[2];
   int status, rlen;
@@ -250,6 +250,11 @@ static void fuzz_all(void) {
 
 int main() {
 
+  in_dir = getenv("IN_DIR");
+  if (in_dir == NULL) fatal("no IN_DIR");
+  target_path = getenv("TARGET_AFL");
+  if (target_path == NULL) fatal("no TARGET_AFL");
+
   unlink(".cur_input");
   out_fd = open(".cur_input", O_RDWR | O_CREAT | O_EXCL, 0600);
   if (out_fd < 0) fatal("Unable to create '.cur_input'");
@@ -259,7 +264,7 @@ int main() {
 
   setup_shm();
   setup_signal_handlers();
-  init_forkserver(target_path);
+  init_forkserver();
   fuzz_all();
 
   return 0;

@@ -12,8 +12,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 pwd = os.path.dirname(os.path.realpath(__file__))
-target_bin = os.path.join(pwd, "example/target/debug/example")
-target_queue = os.path.join(pwd, "example/out/queue")
+target_bin = os.environ["TARGET_SNEU"]
+target_queue = os.environ["TARGET_QUEUE"]
 
 class Net(nn.Module):
 
@@ -132,7 +132,7 @@ if __name__ == "__main__":
         if accuracy >= 80:
             break
     ## mutate 
-    for (x, y) in full_dataset:
+    for (x, y) in full_dataset[0:1]:
         x.requires_grad = True
         y_pred = nn(x)
         loss = loss_fn(y_pred, y)

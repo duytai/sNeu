@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import os
+import os, signal
 import sys
 import re
 import subprocess
@@ -78,6 +78,27 @@ if __name__ == "__main__":
     else:
         print("[+] found %s" % target_sneu)
 
+    ## Run AFL in subprocess
+    pid = os.fork()
 
-
-
+    if pid > 0:
+        ## Run AFL in parent process
+        process = subprocess.Popen(
+            ["afl-fuzz", "-i", in_dir, "-o", out_dir, "%s/%s" % (bin_dir, target_afl)],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=os.environ
+        )
+        while True:
+            output = process.stdout.readline()
+            if output == '' and process.poll() is not None:
+                break
+            if output:
+                print(output.strip().decode("utf-8"))
+        os.kill(process.pid, signal.SIGINT)
+    else:
+        ## Mutate in child process 
+        os.environ["TARGET_SNEU"] = "%s/%s" % (bin_dir, target_sneu)
+        os.environ["TARGET_QUEUE"] = "%s/queue" % out_dir
+        subprocess.call("cd %s && ./mutator.py" % pwd, shell=True)
