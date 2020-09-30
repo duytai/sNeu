@@ -102,4 +102,5 @@ if __name__ == "__main__":
         os.environ["TARGET_AFL"] = "%s/%s" % (bin_dir, target_afl)
         os.environ["TARGET_SNEU"] = "%s/%s" % (bin_dir, target_sneu)
         os.environ["IN_DIR"] = "%s/queue" % out_dir
-        subprocess.call("cd %s && ./mutator.py" % pwd, shell=True)
+        while True:
+            subprocess.call("cd %s && ./mutator.py" % pwd, shell=True)

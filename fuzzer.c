@@ -238,9 +238,8 @@ static void fuzz_all(char* dir) {
     if (!S_ISREG(st.st_mode) || !st.st_size || strstr(fn, "/README.txt")) continue;
     // Fuzz and find
     int ret = run_target(fn, st.st_size);
-    printf("ret: %d\n", ret);
-    uint8_t hnb = has_new_bits(virgin_bits);
-    printf("hnb: %d\n", hnb);
+    int hnb = has_new_bits(virgin_bits);
+    printf("%s:%d:%d\n", fn, ret, hnb);
   }
 
   free(nl);
@@ -269,6 +268,7 @@ int main() {
   setup_signal_handlers();
   init_forkserver(target_path);
   fuzz_all(in_dir);
+  fuzz_all(extra_dir);
 
   return 0;
 }

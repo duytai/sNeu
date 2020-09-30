@@ -133,23 +133,31 @@ if __name__ == "__main__":
         print("[+] epoch %d: loss: %f - acc: %f" % (epoch, loss.item(), accuracy))
         if accuracy >= 80:
             break
-    ## mutate 
-    #  for (x, y) in full_dataset[0:1]:
-        #  x.requires_grad = True
-        #  y_pred = nn(x)
-        #  loss = loss_fn(y_pred, y)
-        #  optimizer.zero_grad()
-        #  loss.backward()
-        #  with torch.no_grad():
-            #  top_k = np.array(x.grad).argsort()[-5:][::-1]
-            #  print(top_k)
 
     EXTRA_DIR = "/tmp/sneu"
     if os.path.exists(EXTRA_DIR):
         shutil.rmtree(EXTRA_DIR)
     os.mkdir(EXTRA_DIR)
-
     os.environ["EXTRA_DIR"] = EXTRA_DIR
+
+    ## mutate 
+    idx = len(full_dataset)
+    for (x, y) in full_dataset:
+        x.requires_grad = True
+        y_pred = nn(x)
+        loss = loss_fn(y_pred, y)
+        optimizer.zero_grad()
+        loss.backward()
+        with torch.no_grad():
+            top_k = np.array(x.grad).argsort()[-5:][::-1]
+            data = x * 128.0 + 128.0
+            data = data.int().numpy()
+            for k in top_k:
+                data[k] = 1
+            with open("%s/id:%d" % (EXTRA_DIR, idx), "wb") as f:
+                f.write(bytearray(data))
+                idx += 1
+
     process = subprocess.Popen(
         [fuzzer],
         stdin=subprocess.PIPE,
@@ -160,6 +168,16 @@ if __name__ == "__main__":
 
     outs, errs = process.communicate()
     if outs:
-        print(outs.decode("utf-8"))
+        lines = outs.decode("utf-8").strip().split("\n")[2:]
+        for line in lines:
+            elems = line.split(":")
+            hnb = int(elems[-1])
+            ret = int(elems[-2])
+            fname = ":".join(elems[:-2])
+            ## TODO: check other error codes
+            if EXTRA_DIR in fname:
+                print("[+] mutated: %s" % line)
+                if not ret:
+                    print("[] FOUND: %d\n" % hbn)
     if errs:
         print(errs.decode("utf-8"))
