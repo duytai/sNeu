@@ -100,5 +100,5 @@ if __name__ == "__main__":
     else:
         ## Mutate in child process 
         os.environ["TARGET_SNEU"] = "%s/%s" % (bin_dir, target_sneu)
-        os.environ["TARGET_QUEUE"] = "%s/queue" % out_dir
+        os.environ["IN_DIR"] = "%s/queue" % out_dir
         subprocess.call("cd %s && ./mutator.py" % pwd, shell=True)

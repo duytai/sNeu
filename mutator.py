@@ -13,7 +13,7 @@ import torch.nn.functional as F
 
 pwd = os.path.dirname(os.path.realpath(__file__))
 target_bin = os.environ["TARGET_SNEU"]
-target_queue = os.environ["TARGET_QUEUE"]
+in_dir = os.environ["IN_DIR"]
 
 class Net(nn.Module):
 
@@ -66,7 +66,7 @@ if __name__ == "__main__":
     raw_dataset = []
     full_dataset = []
 
-    testcases = sorted(list(glob.glob("%s/*" % target_queue)))
+    testcases = sorted(list(glob.glob("%s/*" % in_dir)))
     print("[+] num testcases: %d" % len(testcases))
     for testcase in testcases:
         sub_stat = dict()
@@ -141,3 +141,4 @@ if __name__ == "__main__":
         with torch.no_grad():
             top_k = np.array(x.grad).argsort()[-5:][::-1]
             print(top_k)
+
