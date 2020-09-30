@@ -12,8 +12,7 @@ libllvmrt.a: llvmrt.o
 	$(AR) cr $@ $^
 
 fuzzer: fuzzer.c
-	$(CC) -o $@ $^ 
-	#-fsanitize=address 
+	$(CC) -o $@ $^ -fsanitize=address 
 
 test: libcmpcov.a libllvmrt.a test.c
 	./clang.py -c -g $@.c -o $@.o
