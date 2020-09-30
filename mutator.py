@@ -7,12 +7,14 @@ import glob
 import struct
 import random
 import torch
+import shutil
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 
 pwd = os.path.dirname(os.path.realpath(__file__))
-target_bin = os.environ["TARGET_SNEU"]
+fuzzer = os.path.join(pwd, "fuzzer")
+target_sneu = os.environ["TARGET_SNEU"]
 in_dir = os.environ["IN_DIR"]
 
 class Net(nn.Module):
@@ -71,7 +73,7 @@ if __name__ == "__main__":
     for testcase in testcases:
         sub_stat = dict()
         process = subprocess.Popen(
-            [target_bin],
+            [target_sneu],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -132,13 +134,32 @@ if __name__ == "__main__":
         if accuracy >= 80:
             break
     ## mutate 
-    for (x, y) in full_dataset[0:1]:
-        x.requires_grad = True
-        y_pred = nn(x)
-        loss = loss_fn(y_pred, y)
-        optimizer.zero_grad()
-        loss.backward()
-        with torch.no_grad():
-            top_k = np.array(x.grad).argsort()[-5:][::-1]
-            print(top_k)
+    #  for (x, y) in full_dataset[0:1]:
+        #  x.requires_grad = True
+        #  y_pred = nn(x)
+        #  loss = loss_fn(y_pred, y)
+        #  optimizer.zero_grad()
+        #  loss.backward()
+        #  with torch.no_grad():
+            #  top_k = np.array(x.grad).argsort()[-5:][::-1]
+            #  print(top_k)
 
+    EXTRA_DIR = "/tmp/sneu"
+    if os.path.exists(EXTRA_DIR):
+        shutil.rmtree(EXTRA_DIR)
+    os.mkdir(EXTRA_DIR)
+
+    os.environ["EXTRA_DIR"] = EXTRA_DIR
+    process = subprocess.Popen(
+        [fuzzer],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=os.environ
+    )
+
+    outs, errs = process.communicate()
+    if outs:
+        print(outs.decode("utf-8"))
+    if errs:
+        print(errs.decode("utf-8"))

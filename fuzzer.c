@@ -36,8 +36,6 @@ static int forksrv_pid, fsrv_st_fd, fsrv_ctl_fd, shm_id, child_pid = -1;
 static int out_fd, dev_null_fd, child_timed_out, total_execs;
 static uint8_t* trace_bits;
 static uint8_t virgin_bits[MAP_SIZE];
-static char* target_path = NULL;
-static char* in_dir = NULL;
 
 static void fatal(char* msg) {
   fprintf(stderr, "%s", msg);
@@ -83,7 +81,7 @@ static void setup_signal_handlers() {
   sigaction(SIGALRM, &sa, NULL);
 }
 
-static void init_forkserver() {
+static void init_forkserver(char* target_path) {
   static struct itimerval it;
   int st_pipe[2], ctl_pipe[2];
   int status, rlen;
@@ -226,15 +224,15 @@ static int run_target(char* fname, int len) {
   return FAULT_NONE;
 }
 
-static void fuzz_all(void) {
+static void fuzz_all(char* dir) {
   struct dirent **nl;
   int nl_cnt;
-  nl_cnt = scandir(in_dir, &nl, NULL, alphasort);
+  nl_cnt = scandir(dir, &nl, NULL, alphasort);
   if (nl_cnt < 0) fatal("scandir() failed");
   for (int i = 0; i < nl_cnt; i++) {
     struct stat st;
     char fn[255];
-    sprintf(fn, "%s/%s", in_dir, nl[i]->d_name);
+    sprintf(fn, "%s/%s", dir, nl[i]->d_name);
     free(nl[i]);
     if (lstat(fn, &st) || access(fn, R_OK)) fatal("access failed()");
     if (!S_ISREG(st.st_mode) || !st.st_size || strstr(fn, "/README.txt")) continue;
@@ -249,11 +247,16 @@ static void fuzz_all(void) {
 }
 
 int main() {
+  char* in_dir, *target_path, *extra_dir;
 
   in_dir = getenv("IN_DIR");
   if (in_dir == NULL) fatal("no IN_DIR");
+
   target_path = getenv("TARGET_AFL");
   if (target_path == NULL) fatal("no TARGET_AFL");
+
+  extra_dir = getenv("EXTRA_DIR");
+  if (extra_dir == NULL) fatal("no EXTRA_DIR");
 
   unlink(".cur_input");
   out_fd = open(".cur_input", O_RDWR | O_CREAT | O_EXCL, 0600);
@@ -264,8 +267,8 @@ int main() {
 
   setup_shm();
   setup_signal_handlers();
-  init_forkserver();
-  fuzz_all();
+  init_forkserver(target_path);
+  fuzz_all(in_dir);
 
   return 0;
 }
