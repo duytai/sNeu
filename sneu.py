@@ -9,6 +9,7 @@ import glob
 
 pwd = os.path.dirname(os.path.realpath(__file__))
 rustc = os.path.join(pwd, "rustc.py") 
+fuzzer = os.path.join(pwd, "fuzzer")
 
 in_dir = ""
 out_dir = ""
@@ -47,36 +48,36 @@ if __name__ == "__main__":
     toml_str = open(toml, "r").read()
     matches = re.findall("name\s*=\s*\"([^\"]+)\"", toml_str)
     if not len(matches):
-        print("[x] package name is not found")
+        print("[x] Package name is not found")
         sys.exit()
 
     package = matches[0]
-    print("[+] rust package: '%s'" % package)
+    print("[+] Rust package: '%s'" % package)
 
     if not os.path.exists(os.path.join(bin_dir, target_afl)):
         ## Build fuzz-target for afl 
-        print("[+] build fuzz-target for AFL")
+        print("[+] Build fuzz-target for AFL")
         os.environ["RUSTC"] = rustc
         os.system("cd %s && cargo clean && cargo build" % proj)
 
         ## Copy bin target to bin folder
-        print("[+] copy %s to %s" % (target_afl, bin_dir))
+        print("[+] Copy %s to %s" % (target_afl, bin_dir))
         os.system("cd %s && cp target/debug/%s %s/%s" % (proj, package, bin_dir, target_afl))
     else:
-        print("[+] found %s" % target_afl)
+        print("[+] Found %s" % target_afl)
 
     if not os.path.exists(os.path.join(bin_dir, target_sneu)):
         ## Build fuzz-target for afl 
-        print("[+] build fuzz-target for SNEU")
+        print("[+] Build fuzz-target for SNEU")
         os.environ["RUSTC"] = rustc
         os.environ["USE_SNEU"] = "1"
         os.system("cd %s && cargo clean && cargo build" % proj)
 
         ## Copy bin target to bin folder
-        print("[+] copy %s to %s" % (target_sneu, bin_dir))
+        print("[+] Copy %s to %s" % (target_sneu, bin_dir))
         os.system("cd %s && cp target/debug/%s %s/%s" % (proj, package, bin_dir, target_sneu))
     else:
-        print("[+] found %s" % target_sneu)
+        print("[+] Found %s" % target_sneu)
 
     ## Run AFL in subprocess
     pid = os.fork()
@@ -99,4 +100,9 @@ if __name__ == "__main__":
         os.kill(process.pid, signal.SIGINT)
     else:
         ## Mutate in child process 
-        subprocess.call("cd %s && ./mutator.py -b %s -o %s" % (pwd, bin_dir, out_dir), shell=True)
+        pid = os.fork()
+        if pid > 0:
+            subprocess.call("%s %s/target_afl" % (fuzzer, bin_dir), shell=True)
+        else:
+            pass
+            #  subprocess.call("cd %s && ./mutator.py -b %s -o %s" % (pwd, bin_dir, out_dir), shell=True)

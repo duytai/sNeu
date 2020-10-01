@@ -15,7 +15,6 @@ import torch.nn.functional as F
 D_IN = 100
 D_OUT = 10
 pwd = os.path.dirname(os.path.realpath(__file__))
-fuzzer = os.path.join(pwd, "fuzzer")
 
 class Net(nn.Module):
 
@@ -77,12 +76,12 @@ if __name__ == "__main__":
     raw_dataset = []
     full_dataset = []
 
-    testcases = sorted(list(glob.glob("%s/*" % in_dir)))
+    testcases = sorted(list(glob.glob("%s/queue/*" % out_dir)))
     print("[+] num testcases: %d" % len(testcases))
     for testcase in testcases:
         sub_stat = dict()
         process = subprocess.Popen(
-            [target_sneu],
+            ["%s/target_sneu" % bin_dir],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -157,9 +156,6 @@ if __name__ == "__main__":
             data = data.int().numpy()
             for k in top_k:
                 data[k] = 1
-            with open("%s/id:%d" % (EXTRA_DIR, idx), "wb") as f:
-                f.write(bytearray(data))
-                idx += 1
 
     #  process = subprocess.Popen(
         #  [fuzzer],

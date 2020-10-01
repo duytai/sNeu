@@ -242,7 +242,7 @@ static void server_up(void) {
 
   if (bind(server_fd,(SA*)&server, sizeof(server)) < 0) fatal("bind() failed");
   if (listen(server_fd, 3) < 0) fatal("listen() failed");
-  printf("[+] waiting for incoming connections\n");
+  printf("[+] Waiting for incoming connections\n");
 
   socklen_t tmp = sizeof(client);
   client_fd = accept(server_fd, (SA*)&client, &tmp);
