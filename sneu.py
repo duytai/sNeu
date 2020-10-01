@@ -137,7 +137,7 @@ if __name__ == "__main__":
     pid = os.fork()
 
     if pid > 0:
-        ## Run AFL in parent process
+        ## Run AFL on parent process
         process = subprocess.Popen(
             ["afl-fuzz", "-i", in_dir, "-o", out_dir, "%s/%s" % (bin_dir, target_afl)],
             stdin=subprocess.PIPE,
@@ -153,7 +153,7 @@ if __name__ == "__main__":
                 print(output.strip().decode("utf-8"))
         os.kill(process.pid, signal.SIGINT)
     else:
-        ## Mutate in child process 
+        ## Mutate on child process 
         pid = os.fork()
         if pid > 0:
             subprocess.call("%s %s/target_afl" % (fuzzer, bin_dir), shell=True)
@@ -238,7 +238,7 @@ if __name__ == "__main__":
                     full_dataset.append((torch.tensor(x).float(), torch.tensor(y).float()))
                     new_dataset.append((torch.tensor(x).float(), torch.tensor(y).float()))
 
-                ## TODO: check again
+                ## TODO: check me
                 ## Train on new dataset
                 if len(new_dataset) > 0:
                     for epoch in range(100):
