@@ -8,6 +8,7 @@ import struct
 import random
 import torch
 import sys
+import time
 import socket
 import numpy as np
 import torch.nn as nn
@@ -75,105 +76,115 @@ if __name__ == "__main__":
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect(("127.0.0.1", 1234))
 
-    ## Send all testcases and crashes to fuzzer
-    testcases = sorted(list(glob.glob("%s/queue/id:*" % out_dir)))
-    for testcase in testcases:
-        data = open(testcase, "rb").read()
-        assert len(data) <= 1024
-
-
-    assert False
-
-    random.seed(1)
-    stats = dict()
-    raw_dataset = []
-    full_dataset = []
-
-    testcases = sorted(list(glob.glob("%s/queue/*" % out_dir)))
-    print("[+] num testcases: %d" % len(testcases))
-    for testcase in testcases:
-        sub_stat = dict()
-        process = subprocess.Popen(
-            ["%s/target_sneu" % bin_dir],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            env=os.environ
-        )
-        data = open(testcase, "rb").read()
-        process.communicate(data)
-        cov_file = ".logs/%d.cov" % process.pid
-        cov = open(cov_file, "rb").read()
-        os.remove(cov_file)
-        parse_coverage(cov, stats)
-        parse_coverage(cov, sub_stat)
-        raw_dataset.append((data, sub_stat))
-
-    c_branches = [branch_id for branch_id in stats if sum(stats[branch_id][2:]) >= 2] 
-    u_branches = [branch_id for branch_id in stats if sum(stats[branch_id][2:]) < 2]
-    target_branches = random.choices(u_branches, k=D_OUT)
-
-    print("[+] covers: %d" % len(c_branches))
-    print("[+] uncovers: %d" % len(u_branches))
-    print("[+] target: %d" % len(target_branches))
-
-    # create training raw_dataset 
-    for data, sub_stat in raw_dataset:
-        x = np.zeros(D_IN)
-        # create x
-        assert len(data) <= D_IN
-        for idx, v in enumerate(bytearray(data)):
-            x[idx] = v
-        x = (x - 128.0) / 128.0
-        # create y
-        y = np.zeros(D_OUT)
-        for branch_id in sub_stat:
-            if branch_id in target_branches:
-                idx = target_branches.index(branch_id)
-                y[idx] = sub_stat[branch_id][1]
-        y = np.clip(y / 255.0, 0, 1.0)
-        full_dataset.append((torch.tensor(x).float(), torch.tensor(y).float()))
-
-    # training
+    ## Create NN
     nn = Net(D_IN, D_OUT).float()
     learning_rate = 1e-4
     loss_fn = torch.nn.MSELoss(reduction='sum')
     optimizer = torch.optim.Adam(nn.parameters(), lr=learning_rate)
 
-    ## training
-    for epoch in range(100):
-        accuracy = 0
+    n_testcases = 0
+    n_crashes = 0
+
+    ## Now training + mutating
+    random.seed(1)
+    stats = dict()
+
+    full_dataset = []
+
+    while True:
+        ## Send all testcases and crashes to fuzzer
+        testcases = sorted(list(glob.glob("%s/queue/id:*" % out_dir)))
+        crashes = sorted(list(glob.glob("%s/queue/crashes" % out_dir)))
+
+        new_testcases = testcases[n_testcases:]
+        new_crashes = crashes[n_crashes:]
+
+        for fname in new_testcases + new_crashes:
+            data = open(fname, "rb").read()
+            assert len(data) <= 1024
+            sock.sendall(data)
+            sock.recv(16)
+        print("[+] Send %d testcases to fuzzer" % (len(new_testcases) + len(new_crashes)))
+
+        new_dataset = []
+        raw_dataset = []
+
+        for testcase in new_testcases + new_crashes:
+            sub_stat = dict()
+            process = subprocess.Popen(
+                ["%s/target_sneu" % bin_dir],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=os.environ
+            )
+            data = open(testcase, "rb").read()
+            process.communicate(data)
+            cov_file = ".logs/%d.cov" % process.pid
+            cov = open(cov_file, "rb").read()
+            os.remove(cov_file)
+            parse_coverage(cov, stats)
+            parse_coverage(cov, sub_stat)
+            raw_dataset.append((data, sub_stat))
+
+        c_branches = [branch_id for branch_id in stats if sum(stats[branch_id][2:]) >= 2] 
+        u_branches = [branch_id for branch_id in stats if sum(stats[branch_id][2:]) < 2]
+        target_branches = random.choices(u_branches, k=D_OUT)
+        print("[+] Covered: %d/%d - Target: %d" % (len(c_branches), len(c_branches) + len(u_branches), len(target_branches)))
+
+        for data, sub_stat in raw_dataset:
+            # Create x
+            x = np.zeros(D_IN)
+            assert len(data) <= D_IN
+            for idx, v in enumerate(bytearray(data)):
+                x[idx] = v
+            x = (x - 128.0) / 128.0
+            # Create y
+            y = np.zeros(D_OUT)
+            for branch_id in sub_stat:
+                if branch_id in target_branches:
+                    idx = target_branches.index(branch_id)
+                    y[idx] = sub_stat[branch_id][1]
+            y = np.clip(y / 255.0, 0, 1.0)
+            # Append
+            full_dataset.append((torch.tensor(x).float(), torch.tensor(y).float()))
+            new_dataset.append((torch.tensor(x).float(), torch.tensor(y).float()))
+
+        ## TODO: check again
+        ## Train on new dataset
+        if len(new_dataset) > 0:
+            for epoch in range(100):
+                accuracy = 0
+                for (x, y) in new_dataset:
+                    y_pred = nn(x)
+                    loss = loss_fn(y_pred, y)
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
+                    with torch.no_grad():
+                        accuracy += is_match(y, y_pred) / len(new_dataset) * 100
+                if accuracy >= 80:
+                    print("[+] Epoch %d: loss: %f - acc: %f" % (epoch, loss.item(), accuracy))
+                    break
+
+        ## Mutate on full_dataset
         for (x, y) in full_dataset:
+            x.requires_grad = True
             y_pred = nn(x)
             loss = loss_fn(y_pred, y)
             optimizer.zero_grad()
             loss.backward()
-            optimizer.step()
             with torch.no_grad():
-                accuracy += is_match(y, y_pred) / len(full_dataset) * 100
-        print("[+] epoch %d: loss: %f - acc: %f" % (epoch, loss.item(), accuracy))
-        if accuracy >= 80:
-            break
+                top_k = np.array(x.grad).argsort()[-5:][::-1]
+                data = x * 128.0 + 128.0
+                data = data.int().numpy()
+                for k in top_k:
+                    data[k] = 1
+                sock.sendall(bytearray(data))
+                code, hbn = [int(x) for x in sock.recv(16).strip().decode("utf-8").split(":")[:2]]
+                print("[+] Code: %d - Hbn: %d" % (code, hbn))
 
-    ## mutate 
-    idx = len(full_dataset)
-    for (x, y) in full_dataset:
-        x.requires_grad = True
-        y_pred = nn(x)
-        loss = loss_fn(y_pred, y)
-        optimizer.zero_grad()
-        loss.backward()
-        with torch.no_grad():
-            top_k = np.array(x.grad).argsort()[-5:][::-1]
-            data = x * 128.0 + 128.0
-            data = data.int().numpy()
-            for k in top_k:
-                data[k] = 1
-
-    #  process = subprocess.Popen(
-        #  [fuzzer],
-        #  stdin=subprocess.PIPE,
-        #  stdout=subprocess.PIPE,
-        #  stderr=subprocess.PIPE,
-        #  env=os.environ
-    #  )
+        ## Update number of testcases
+        n_testcases = len(testcases)
+        n_crashes = len(crashes)
+        time.sleep(2)

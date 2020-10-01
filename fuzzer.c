@@ -251,6 +251,7 @@ static void server_up(void) {
     printf("[+] Connection is accepted\n");
 
     while ((rlen = recv(client_fd, in_buf, sizeof(in_buf), 0)) > 0) {
+      printf("rlen: %d\n", rlen);
       int ret = run_target(in_buf, rlen);
       int hnb = has_new_bits(virgin_bits);
       sprintf(out_buf, "%d:%d\n", ret, hnb > 0 ? 1 : 0);
