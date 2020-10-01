@@ -134,12 +134,6 @@ if __name__ == "__main__":
         if accuracy >= 80:
             break
 
-    EXTRA_DIR = "/tmp/sneu"
-    if os.path.exists(EXTRA_DIR):
-        shutil.rmtree(EXTRA_DIR)
-    os.mkdir(EXTRA_DIR)
-    os.environ["EXTRA_DIR"] = EXTRA_DIR
-
     ## mutate 
     idx = len(full_dataset)
     for (x, y) in full_dataset:
@@ -158,26 +152,10 @@ if __name__ == "__main__":
                 f.write(bytearray(data))
                 idx += 1
 
-    process = subprocess.Popen(
-        [fuzzer],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        env=os.environ
-    )
-
-    outs, errs = process.communicate()
-    if outs:
-        lines = outs.decode("utf-8").strip().split("\n")[2:]
-        for line in lines:
-            elems = line.split(":")
-            hnb = int(elems[-1])
-            ret = int(elems[-2])
-            fname = ":".join(elems[:-2])
-            ## TODO: check other error codes
-            if EXTRA_DIR in fname:
-                print("[+] mutated: %s" % line)
-                if not ret:
-                    print("[] FOUND: %d\n" % hbn)
-    if errs:
-        print(errs.decode("utf-8"))
+    #  process = subprocess.Popen(
+        #  [fuzzer],
+        #  stdin=subprocess.PIPE,
+        #  stdout=subprocess.PIPE,
+        #  stderr=subprocess.PIPE,
+        #  env=os.environ
+    #  )
