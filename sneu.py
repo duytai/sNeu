@@ -180,7 +180,7 @@ if __name__ == "__main__":
             full_dataset = []
 
             while True:
-                ## Send all testcases and crashes to fuzzer
+                ## Send new testcases and crashes to fuzzer
                 testcases = sorted(list(glob.glob("%s/queue/id:*" % out_dir)))
                 crashes = sorted(list(glob.glob("%s/queue/crashes" % out_dir)))
 
@@ -256,6 +256,8 @@ if __name__ == "__main__":
                             break
 
                 ## Mutate on full_dataset
+                n_gen_crashes = 0
+                n_gen_interest = 0
                 for (x, y) in full_dataset:
                     x.requires_grad = True
                     y_pred = nn(x)
@@ -268,13 +270,17 @@ if __name__ == "__main__":
                         data = data.int().numpy()
                         for k in top_k:
                             data[k] = 1
-                        sock.sendall(bytearray(data.tolist()))
+                        str_len = np.where(data != 0)[0][-1] + 1
+                        sock.sendall(bytearray(data[:str_len].tolist()))
                         code, hbn = [int(x) for x in sock.recv(16).strip().decode("utf-8").split(":")[:2]]
-                        print("[+] Code: %d - Hbn: %d" % (code, hbn))
                         if hbn > 0:
-                            print("[+] Found new testcases")
+                            if not code:
+                                n_gen_crashes += 1
+                            else:
+                                n_gen_interest += 1
 
+                print("[+] Found %d interest - %d crashes" % (n_gen_crashes, n_gen_interest))
                 ## Update number of testcases
                 n_testcases = len(testcases)
                 n_crashes = len(crashes)
-                time.sleep(2)
+                time.sleep(5)
