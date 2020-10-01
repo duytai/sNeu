@@ -22,6 +22,7 @@
 #define SHM_ENV_VAR "__AFL_SHM_ID"
 #define SA struct sockaddr
 #define PORT 1234
+#define IN_BUF_SIZE 1024
 
 #define MEM_BARRIER() \
   __asm__ volatile("" ::: "memory")
@@ -174,18 +175,13 @@ static uint8_t has_new_bits(uint8_t* virgin_map) {
   return ret;
 }
 
-static int run_target(char* fname, int len) {
+static int run_target(char* used_mem, int len) {
   static struct itimerval it;
   static int prev_timed_out = 0;
   int status, res, kill_signal;
-  char use_mem[len];
 
-  int fd = open(fname, O_RDONLY);
-  if (fd < 0) fatal("open() failed");
-  if (read(fd, use_mem, len) != len) fatal("read() failed");
-  close(fd);
   lseek(out_fd, 0, SEEK_SET);
-  if (write(out_fd, use_mem, len) != len) fatal("write() failed");
+  if (write(out_fd, used_mem, len) != len) fatal("write() failed");
   if (ftruncate(out_fd, len)) fatal("ftruncate() failed");
   lseek(out_fd, 0, SEEK_SET);
 
@@ -251,7 +247,9 @@ static int run_target(char* fname, int len) {
 // }
 static void server_up(void) {
   struct sockaddr_in server, client;
-  int rlen, slen, server_fd, client_fd, flag = 1;
+  int rlen, server_fd, client_fd, flag = 1;
+  char in_buf[IN_BUF_SIZE];
+  char out_buf[100];
 
   server_fd = socket(AF_INET, SOCK_STREAM, 0);
   if (server_fd < 0) fatal("socket() failed");
@@ -270,11 +268,13 @@ static void server_up(void) {
   client_fd = accept(server_fd, (SA*)&client, &tmp);
   if (client_fd < 0) fatal("accept() failed");
   
-  char buf[1024];
-  rlen = recv(client_fd, buf, sizeof(buf), 0);
-  if (rlen < 0) fatal("recv() failed");
-  slen = send(client_fd, buf, rlen, 0);
-  if (slen < 0) fatal("send() failed");
+
+  while ((rlen = recv(client_fd, in_buf, sizeof(in_buf), 0)) > 0) {
+    int ret = run_target(in_buf, rlen);
+    int hnb = has_new_bits(virgin_bits);
+    sprintf(out_buf, "%d:%d\n", ret, hnb > 0 ? 1 : 0);
+    send(client_fd, out_buf, strlen(out_buf), 0);
+  }
 
   printf("[+] close and exit\n");
 
@@ -299,9 +299,9 @@ int main(int argv, char** argc) {
   dev_null_fd = open("/dev/null", O_RDWR);
   if (dev_null_fd < 0) fatal("Unable to open /dev/null");
 
-  // setup_shm();
-  // setup_signal_handlers();
-  // init_forkserver(target_path);
+  setup_shm();
+  setup_signal_handlers();
+  init_forkserver(target_path);
   server_up();
 
   return 0;
