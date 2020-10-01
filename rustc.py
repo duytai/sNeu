@@ -12,11 +12,6 @@ lib = lib if "USE_SNEU" in os.environ else ["-l", "llvmrt"]
 
 argv = sys.argv[1:]
 
-#  with open("log.txt", "a") as f:
-    #  f.write(str(argv))
-    #  f.write("\n---------\n")
-    #  f.close()
-
 argv = ["rustc"] + argv + lib + [
     "-C", "relocation-model=static",
     "-C", "passes=sancov",
