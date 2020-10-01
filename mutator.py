@@ -7,15 +7,15 @@ import glob
 import struct
 import random
 import torch
-import shutil
+import sys
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 
+D_IN = 100
+D_OUT = 10
 pwd = os.path.dirname(os.path.realpath(__file__))
 fuzzer = os.path.join(pwd, "fuzzer")
-target_sneu = os.environ["TARGET_SNEU"]
-in_dir = os.environ["IN_DIR"]
 
 class Net(nn.Module):
 
@@ -60,8 +60,17 @@ def parse_coverage(cov, stats):
 
 if __name__ == "__main__":
 
-    D_IN = 100
-    D_OUT = 10
+    argv = sys.argv[1:]
+
+    for idx in range(0, len(argv), 2):
+        opt, val = argv[idx], argv[idx + 1]
+        if opt == "-o":
+            out_dir = val
+        if opt == "-b":
+            bin_dir = val
+
+    assert out_dir, "[x] require -o"
+    assert bin_dir, "[x] require -b"
 
     random.seed(1)
     stats = dict()

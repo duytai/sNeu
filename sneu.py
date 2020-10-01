@@ -32,10 +32,10 @@ if __name__ == "__main__":
         if opt == "-b":
             bin_dir = val
 
-    print("[!] in_dir = %s" % in_dir)
-    print("[!] out_dir = %s" % out_dir)
-    print("[!] bin_dir = %s" % bin_dir)
-    print("[!] proj = %s" % proj)
+    assert in_dir, "[x] require -i"
+    assert out_dir, "[x] require -o"
+    assert proj, "[x] require -p"
+    assert bin_dir, "[x] require -b"
 
     # Is proj a rust project
     toml = os.path.join(proj, "Cargo.toml")
@@ -99,8 +99,4 @@ if __name__ == "__main__":
         os.kill(process.pid, signal.SIGINT)
     else:
         ## Mutate in child process 
-        os.environ["TARGET_AFL"] = "%s/%s" % (bin_dir, target_afl)
-        os.environ["TARGET_SNEU"] = "%s/%s" % (bin_dir, target_sneu)
-        os.environ["IN_DIR"] = "%s/queue" % out_dir
-        while True:
-            subprocess.call("cd %s && ./mutator.py" % pwd, shell=True)
+        subprocess.call("cd %s && ./mutator.py -b %s -o %s" % (pwd, bin_dir, out_dir), shell=True)
