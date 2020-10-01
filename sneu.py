@@ -138,25 +138,27 @@ if __name__ == "__main__":
 
     if pid > 0:
         ## Run AFL on parent process
-        process = subprocess.Popen(
-            ["afl-fuzz", "-i", in_dir, "-o", out_dir, "%s/%s" % (bin_dir, target_afl)],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            env=os.environ
-        )
-        while True:
-            output = process.stdout.readline()
-            if output == '' and process.poll() is not None:
-                break
-            if output:
-                print(output.strip().decode("utf-8"))
-        os.kill(process.pid, signal.SIGINT)
+        try:
+            process = subprocess.Popen(
+                ["afl-fuzz", "-i", in_dir, "-o", out_dir, "%s/%s" % (bin_dir, target_afl)],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=os.environ
+            )
+            while True:
+                output = process.stdout.readline()
+                if output == '' and process.poll() is not None:
+                    break
+                if output:
+                    print(output.strip().decode("utf-8"))
+        except KeyboardInterrupt:
+            os.kill(process.pid, signal.SIGINT)
     else:
         ## Mutate on child process 
         pid = os.fork()
         if pid > 0:
-            subprocess.call("%s %s/target_afl" % (fuzzer, bin_dir), shell=True)
+            subprocess.Popen("%s %s/target_afl" % (fuzzer, bin_dir), shell=True)
         else:
             ## Wait for fuzzer is up
             time.sleep(2)
