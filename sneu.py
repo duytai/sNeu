@@ -116,7 +116,7 @@ if __name__ == "__main__":
 
         ## Copy bin target to bin folder
         print("[+] Copy %s to %s" % (target_afl, bin_dir))
-        os.system("cd %s && cp target/debug/%s %s/%s" % (proj, package, bin_dir, target_afl))
+        os.system("cp %s/target/debug/%s %s/%s" % (proj, package, bin_dir, target_afl))
     else:
         print("[+] Found %s" % target_afl)
 
@@ -129,7 +129,7 @@ if __name__ == "__main__":
 
         ## Copy bin target to bin folder
         print("[+] Copy %s to %s" % (target_sneu, bin_dir))
-        os.system("cd %s && cp target/debug/%s %s/%s" % (proj, package, bin_dir, target_sneu))
+        os.system("cp %s/target/debug/%s %s/%s" % (proj, package, bin_dir, target_sneu))
     else:
         print("[+] Found %s" % target_sneu)
 
@@ -279,7 +279,7 @@ if __name__ == "__main__":
                             else:
                                 n_gen_interest += 1
 
-                print("[+] Found %d interest - %d crashes" % (n_gen_crashes, n_gen_interest))
+                print("[+] GENERATED %d interest - %d crashes" % (n_gen_crashes, n_gen_interest))
                 ## Update number of testcases
                 n_testcases = len(testcases)
                 n_crashes = len(crashes)
