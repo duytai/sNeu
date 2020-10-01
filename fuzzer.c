@@ -244,21 +244,23 @@ static void server_up(void) {
   if (listen(server_fd, 3) < 0) fatal("listen() failed");
   printf("[+] Waiting for incoming connections\n");
 
-  socklen_t tmp = sizeof(client);
-  client_fd = accept(server_fd, (SA*)&client, &tmp);
-  if (client_fd < 0) fatal("accept() failed");
-  
+  while (1) {
+    socklen_t tmp = sizeof(client);
+    client_fd = accept(server_fd, (SA*)&client, &tmp);
+    if (client_fd < 0) fatal("accept() failed");
+    printf("[+] Connection is accepted\n");
 
-  while ((rlen = recv(client_fd, in_buf, sizeof(in_buf), 0)) > 0) {
-    int ret = run_target(in_buf, rlen);
-    int hnb = has_new_bits(virgin_bits);
-    sprintf(out_buf, "%d:%d\n", ret, hnb > 0 ? 1 : 0);
-    send(client_fd, out_buf, strlen(out_buf), 0);
+    while ((rlen = recv(client_fd, in_buf, sizeof(in_buf), 0)) > 0) {
+      int ret = run_target(in_buf, rlen);
+      int hnb = has_new_bits(virgin_bits);
+      sprintf(out_buf, "%d:%d\n", ret, hnb > 0 ? 1 : 0);
+      send(client_fd, out_buf, strlen(out_buf), 0);
+    }
+
+    close(client_fd);
+    printf("[+] Waiting for incoming connections\n");
   }
 
-  printf("[+] close and exit\n");
-
-  close(client_fd);
   close(server_fd);
 }
 

@@ -8,6 +8,7 @@ import struct
 import random
 import torch
 import sys
+import socket
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
@@ -70,6 +71,18 @@ if __name__ == "__main__":
 
     assert out_dir, "[x] require -o"
     assert bin_dir, "[x] require -b"
+    ## Open socket
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect(("127.0.0.1", 1234))
+
+    ## Send all testcases and crashes to fuzzer
+    testcases = sorted(list(glob.glob("%s/queue/id:*" % out_dir)))
+    for testcase in testcases:
+        data = open(testcase, "rb").read()
+        assert len(data) <= 1024
+
+
+    assert False
 
     random.seed(1)
     stats = dict()

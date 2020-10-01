@@ -9,6 +9,7 @@ import glob
 
 pwd = os.path.dirname(os.path.realpath(__file__))
 rustc = os.path.join(pwd, "rustc.py") 
+mutator = os.path.join(pwd, "mutator.py")
 fuzzer = os.path.join(pwd, "fuzzer")
 
 in_dir = ""
@@ -104,5 +105,4 @@ if __name__ == "__main__":
         if pid > 0:
             subprocess.call("%s %s/target_afl" % (fuzzer, bin_dir), shell=True)
         else:
-            pass
-            #  subprocess.call("cd %s && ./mutator.py -b %s -o %s" % (pwd, bin_dir, out_dir), shell=True)
+            subprocess.call("%s -b %s -o %s" % (mutator, bin_dir, out_dir), shell=True)
