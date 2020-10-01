@@ -225,26 +225,6 @@ static int run_target(char* used_mem, int len) {
   return FAULT_NONE;
 }
 
-// static void fuzz_all(char* dir) {
-  // struct dirent **nl;
-  // int nl_cnt;
-  // nl_cnt = scandir(dir, &nl, NULL, alphasort);
-  // if (nl_cnt < 0) fatal("scandir() failed");
-  // for (int i = 0; i < nl_cnt; i++) {
-    // struct stat st;
-    // char fn[255];
-    // sprintf(fn, "%s/%s", dir, nl[i]->d_name);
-    // free(nl[i]);
-    // if (lstat(fn, &st) || access(fn, R_OK)) fatal("access failed()");
-    // if (!S_ISREG(st.st_mode) || !st.st_size || strstr(fn, "/README.txt")) continue;
-    // Fuzz and find
-    // int ret = run_target(fn, st.st_size);
-    // int hnb = has_new_bits(virgin_bits);
-    // printf("%s:%d:%d\n", fn, ret, hnb);
-  // }
-//
-  // free(nl);
-// }
 static void server_up(void) {
   struct sockaddr_in server, client;
   int rlen, server_fd, client_fd, flag = 1;
