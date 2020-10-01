@@ -196,7 +196,6 @@ if __name__ == "__main__":
                     sock.recv(16)
                 print("[+] Send %d testcases to fuzzer" % (len(new_testcases) + len(new_crashes)))
 
-                new_dataset = []
                 raw_dataset = []
 
                 for testcase in new_testcases + new_crashes:
@@ -238,24 +237,27 @@ if __name__ == "__main__":
                     y = np.clip(y / 255.0, 0, 1.0)
                     # Append
                     full_dataset.append((torch.tensor(x).float(), torch.tensor(y).float()))
-                    new_dataset.append((torch.tensor(x).float(), torch.tensor(y).float()))
 
-                ## TODO: check me
-                ## Train on new dataset
-                if len(new_dataset) > 0:
-                    for epoch in range(100):
-                        accuracy = 0
-                        for (x, y) in new_dataset:
-                            y_pred = nn(x)
-                            loss = loss_fn(y_pred, y)
-                            optimizer.zero_grad()
-                            loss.backward()
-                            optimizer.step()
-                            with torch.no_grad():
-                                accuracy += is_match(y, y_pred) / len(new_dataset) * 100
-                        if accuracy >= 80:
-                            print("[+] Epoch %d: loss: %f - acc: %f" % (epoch, loss.item(), accuracy))
-                            break
+                ## TODO
+                ## Reset parameters 
+                for layer in nn.children():
+                    if hasattr(layer, 'reset_parameters'):
+                        layer.reset_parameters()
+
+                ## Train on full_dataset 
+                for epoch in range(100):
+                    accuracy = 0
+                    for (x, y) in full_dataset:
+                        y_pred = nn(x)
+                        loss = loss_fn(y_pred, y)
+                        optimizer.zero_grad()
+                        loss.backward()
+                        optimizer.step()
+                        with torch.no_grad():
+                            accuracy += is_match(y, y_pred) / len(full_dataset) * 100
+                    if accuracy >= 80:
+                        print("[+] Epoch %d: loss: %f - acc: %f" % (epoch, loss.item(), accuracy))
+                        break
 
                 ## Mutate on full_dataset
                 n_gen_crashes = 0
