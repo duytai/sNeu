@@ -17,8 +17,8 @@ import torch.nn.functional as F
 
 pwd = os.path.dirname(os.path.realpath(__file__))
 rustc = os.path.join(pwd, "rustc.py") 
-mutator = os.path.join(pwd, "mutator.py")
 fuzzer = os.path.join(pwd, "fuzzer")
+afl_fuzz = os.path.join(pwd, "afl-fuzz.py")
 
 in_dir = ""
 out_dir = ""
@@ -71,7 +71,6 @@ def parse_coverage(cov, stats):
             stats[branch_id][2] = max(stats[branch_id][2], 1 if distance < 0 else 0)
             stats[branch_id][3] = max(stats[branch_id][3], 1 if distance == 0 else 0)
             stats[branch_id][4] = max(stats[branch_id][4], 1 if distance > 0 else 0)
-
 
 if __name__ == "__main__":
     argv = sys.argv[1:]
@@ -138,27 +137,14 @@ if __name__ == "__main__":
 
     if pid > 0:
         ## Run AFL on parent process
-        try:
-            process = subprocess.Popen(
-                ["afl-fuzz", "-i", in_dir, "-o", out_dir, "%s/%s" % (bin_dir, target_afl)],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                env=os.environ
-            )
-            while True:
-                output = process.stdout.readline()
-                if output == '' and process.poll() is not None:
-                    break
-                if output:
-                    print(output.strip().decode("utf-8"))
-        except KeyboardInterrupt:
-            os.kill(process.pid, signal.SIGINT)
+        process = subprocess.Popen("%s -i %s -o %s -b %s" % (afl_fuzz, in_dir, out_dir, bin_dir), shell=True)
+        os.waitpid(process.pid, 0)
     else:
         ## Mutate on child process 
         pid = os.fork()
         if pid > 0:
-            subprocess.Popen("%s %s/target_afl" % (fuzzer, bin_dir), shell=True)
+            process = subprocess.Popen("%s %s/target_afl" % (fuzzer, bin_dir), shell=True)
+            os.waitpid(process.pid, 0)
         else:
             ## Wait for fuzzer is up
             time.sleep(2)
@@ -260,8 +246,8 @@ if __name__ == "__main__":
                         break
 
                 ## Mutate on full_dataset
-                n_gen_crashes = 0
-                n_gen_interest = 0
+                g_interests = []
+                g_crashes = []
                 for (x, y) in full_dataset:
                     x.requires_grad = True
                     y_pred = nn(x)
@@ -279,11 +265,16 @@ if __name__ == "__main__":
                         code, hbn = [int(x) for x in sock.recv(16).strip().decode("utf-8").split(":")[:2]]
                         if hbn > 0:
                             if not code:
-                                n_gen_crashes += 1
+                                g_interests.append(bytearray(data[:str_len].tolist()))
                             else:
-                                n_gen_interest += 1
+                                g_crashes.append(bytearray(data[:str_len].tolist()))
 
-                print("[+] GENERATED %d interest - %d crashes" % (n_gen_crashes, n_gen_interest))
+                print("[+] GENERATED %d interest - %d crashes" % (len(g_interests), len(g_crashes)))
+
+                ## Write to in_dir and resume AFL 
+                #  if len(g_interests) + len(g_crashes) > 0:
+                    #  os.kill(afl_pid, signal.SIGINT)
+
                 ## Update number of testcases
                 n_testcases = len(testcases)
                 n_crashes = len(crashes)
