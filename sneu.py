@@ -19,7 +19,6 @@ import multiprocessing
 pwd = os.path.dirname(os.path.realpath(__file__))
 rustc = os.path.join(pwd, "rustc.py") 
 fuzzer = os.path.join(pwd, "fuzzer")
-afl_fuzz = os.path.join(pwd, "afl-fuzz.py")
 
 in_dir = ""
 out_dir = ""
@@ -134,23 +133,31 @@ if __name__ == "__main__":
         print("[+] Found %s" % target_sneu)
 
     ## Run AFL in subprocess
+    logger = open("log.txt", "w")
     w1, w2 = multiprocessing.Pipe()
 
     if os.fork() > 0:
+        process = subprocess.Popen(
+            ["afl-fuzz", "-i", in_dir, "-o", out_dir, "%s/%s" % (bin_dir, target_afl)],
+            stdin=subprocess.PIPE,
+            stdout=logger,
+            stderr=logger,
+            env=os.environ
+        )
         ## Run AFL on parent process
-        process = subprocess.Popen("%s -i %s -o %s -b %s" % (afl_fuzz, in_dir, out_dir, bin_dir), shell=True)
         w1.send(str(process.pid))
-        os.waitpid(process.pid, 0)
-
+        process.wait()
         while True:
-            # Find AFL and KILL
-            fuzzer_stats = open("%s/fuzzer_stats" % out_dir, "r").read()
-            pid = int(re.findall("fuzzer_pid\s*:\s*(\d+)", fuzzer_stats)[0])
-            os.kill(pid, signal.SIGINT)
-            # Restart AFL
-            process = subprocess.Popen("%s -o %s -b %s" % (afl_fuzz, out_dir, bin_dir), shell=True)
+            process = subprocess.Popen(
+                ["afl-fuzz", "-i-", "-o", out_dir, "%s/%s" % (bin_dir, target_afl)],
+                stdin=subprocess.PIPE,
+                stdout=logger,
+                stderr=logger,
+                env=os.environ
+            )
+            ## Run AFL on parent process
             w1.send(str(process.pid))
-            os.waitpid(process.pid, 0)
+            process.wait()
 
     else:
         ## Mutate on child process 
@@ -285,7 +292,7 @@ if __name__ == "__main__":
 
                 ## Write to in_dir and resume AFL 
                 if len(g_interests) + len(g_crashes) > 0:
-                    os.kill(int(w2.recv()), signal.SIGKILL)
+                    os.kill(int(w2.recv()), signal.SIGINT)
 
                 ## Update number of testcases
                 n_testcases = len(testcases)
