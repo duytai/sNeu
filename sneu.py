@@ -14,7 +14,6 @@ import socket
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
-import multiprocessing
 
 pwd = os.path.dirname(os.path.realpath(__file__))
 rustc = os.path.join(pwd, "rustc.py") 
@@ -30,6 +29,9 @@ D_OUT = 10
 
 target_afl = "target_afl"
 target_sneu = "target_sneu"
+
+master = "fuzzer01"
+slave = "fuzzer02"
 
 class Net(nn.Module):
 
@@ -133,38 +135,34 @@ if __name__ == "__main__":
         print("[+] Found %s" % target_sneu)
 
     ## Run AFL in subprocess
-    logger = open("log.txt", "w")
-    w1, w2 = multiprocessing.Pipe()
 
     if os.fork() > 0:
-        process = subprocess.Popen(
-            ["afl-fuzz", "-i", in_dir, "-o", out_dir, "%s/%s" % (bin_dir, target_afl)],
-            stdin=subprocess.PIPE,
-            stdout=logger,
-            stderr=logger,
-            env=os.environ
-        )
-        ## Run AFL on parent process
-        w1.send(str(process.pid))
-        process.wait()
-        while True:
+        try:
+            logger = open("log.txt", "w")
             process = subprocess.Popen(
-                ["afl-fuzz", "-i-", "-o", out_dir, "%s/%s" % (bin_dir, target_afl)],
+                ["afl-fuzz", "-i", in_dir, "-o", out_dir, "-M", master, "%s/%s" % (bin_dir, target_afl)],
                 stdin=subprocess.PIPE,
                 stdout=logger,
                 stderr=logger,
                 env=os.environ
             )
-            ## Run AFL on parent process
-            w1.send(str(process.pid))
+            print("[+] Start afl-fuzz %s" % master)
             process.wait()
+        except KeyboardInterrupt:
+            pass
 
     else:
         ## Mutate on child process 
         if os.fork() > 0:
-            process = subprocess.Popen("%s %s/target_afl" % (fuzzer, bin_dir), shell=True)
-            os.waitpid(process.pid, 0)
+            try:
+                process = subprocess.Popen("%s %s/target_afl" % (fuzzer, bin_dir), shell=True)
+                process.wait()
+            except KeyboardInterrupt:
+                pass
         else:
+            ## Set up queue for fuzzer02
+            if not os.path.exists("%s/%s/queue" % (out_dir, slave)):
+                os.makedirs("%s/%s/queue" % (out_dir, slave))
             ## Wait for fuzzer is up
             time.sleep(2)
             ## Open socket
@@ -188,8 +186,8 @@ if __name__ == "__main__":
 
             while True:
                 ## Send new testcases and crashes to fuzzer
-                testcases = sorted(list(glob.glob("%s/queue/id:*" % out_dir)))
-                crashes = sorted(list(glob.glob("%s/queue/crashes" % out_dir)))
+                testcases = sorted(list(glob.glob("%s/%s/queue/id:*" % (out_dir, master))))
+                crashes = sorted(list(glob.glob("%s/%s/queue/crashes" % (out_dir, master))))
 
                 new_testcases = testcases[n_testcases:]
                 new_crashes = crashes[n_crashes:]
@@ -292,7 +290,7 @@ if __name__ == "__main__":
 
                 ## Write to in_dir and resume AFL 
                 if len(g_interests) + len(g_crashes) > 0:
-                    os.kill(int(w2.recv()), signal.SIGINT)
+                    pass
 
                 ## Update number of testcases
                 n_testcases = len(testcases)
