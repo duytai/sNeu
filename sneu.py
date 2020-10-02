@@ -14,6 +14,7 @@ import socket
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
+import multiprocessing
 
 pwd = os.path.dirname(os.path.realpath(__file__))
 rustc = os.path.join(pwd, "rustc.py") 
@@ -133,16 +134,27 @@ if __name__ == "__main__":
         print("[+] Found %s" % target_sneu)
 
     ## Run AFL in subprocess
-    pid = os.fork()
+    w1, w2 = multiprocessing.Pipe()
 
-    if pid > 0:
+    if os.fork() > 0:
         ## Run AFL on parent process
         process = subprocess.Popen("%s -i %s -o %s -b %s" % (afl_fuzz, in_dir, out_dir, bin_dir), shell=True)
+        w1.send(str(process.pid))
         os.waitpid(process.pid, 0)
+
+        while True:
+            # Find AFL and KILL
+            fuzzer_stats = open("%s/fuzzer_stats" % out_dir, "r").read()
+            pid = int(re.findall("fuzzer_pid\s*:\s*(\d+)", fuzzer_stats)[0])
+            os.kill(pid, signal.SIGINT)
+            # Restart AFL
+            process = subprocess.Popen("%s -o %s -b %s" % (afl_fuzz, out_dir, bin_dir), shell=True)
+            w1.send(str(process.pid))
+            os.waitpid(process.pid, 0)
+
     else:
         ## Mutate on child process 
-        pid = os.fork()
-        if pid > 0:
+        if os.fork() > 0:
             process = subprocess.Popen("%s %s/target_afl" % (fuzzer, bin_dir), shell=True)
             os.waitpid(process.pid, 0)
         else:
@@ -272,8 +284,8 @@ if __name__ == "__main__":
                 print("[+] GENERATED %d interest - %d crashes" % (len(g_interests), len(g_crashes)))
 
                 ## Write to in_dir and resume AFL 
-                #  if len(g_interests) + len(g_crashes) > 0:
-                    #  os.kill(afl_pid, signal.SIGINT)
+                if len(g_interests) + len(g_crashes) > 0:
+                    os.kill(int(w2.recv()), signal.SIGKILL)
 
                 ## Update number of testcases
                 n_testcases = len(testcases)
