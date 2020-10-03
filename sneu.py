@@ -14,10 +14,12 @@ import socket
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
+import mutator as M
 
 pwd = os.path.dirname(os.path.realpath(__file__))
 rustc = os.path.join(pwd, "rustc.py") 
 fuzzer = os.path.join(pwd, "fuzzer")
+#  test_name = "%s/id:%06d,src:sneu" % (queue_dir, test_id)
 
 in_dir = ""
 out_dir = ""
@@ -160,9 +162,13 @@ if __name__ == "__main__":
             except KeyboardInterrupt:
                 pass
         else:
-            ## Set up queue for fuzzer02
-            if not os.path.exists("%s/%s/queue" % (out_dir, slave)):
-                os.makedirs("%s/%s/queue" % (out_dir, slave))
+            ## Set up queue for slave
+            queue_dir = "%s/%s/queue" % (out_dir, slave)
+            if not os.path.exists(queue_dir):
+                os.makedirs(queue_dir)
+            test_id = len(glob.glob("%s/id:*" % queue_dir))
+            print("[+] Queue at %s" % queue_dir)
+            print("[+] Testcase id %d" % test_id)
             ## Wait for fuzzer is up
             time.sleep(2)
             ## Open socket
@@ -239,7 +245,7 @@ if __name__ == "__main__":
                             y[idx] = sub_stat[branch_id][1]
                     y = np.clip(y / 255.0, 0, 1.0)
                     # Append
-                    full_dataset.append((torch.tensor(x).float(), torch.tensor(y).float()))
+                    full_dataset.append((torch.tensor(x).float(), torch.tensor(y).float(), sub_stat))
 
                 ## TODO
                 ## Reset parameters 
@@ -250,7 +256,7 @@ if __name__ == "__main__":
                 ## Train on full_dataset 
                 for epoch in range(100):
                     accuracy = 0
-                    for (x, y) in full_dataset:
+                    for (x, y, _) in full_dataset:
                         y_pred = nn(x)
                         loss = loss_fn(y_pred, y)
                         optimizer.zero_grad()
@@ -263,9 +269,7 @@ if __name__ == "__main__":
                         break
 
                 ## Mutate on full_dataset
-                g_interests = []
-                g_crashes = []
-                for (x, y) in full_dataset:
+                for (x, y, sub_stat) in full_dataset:
                     x.requires_grad = True
                     y_pred = nn(x)
                     loss = loss_fn(y_pred, y)
@@ -274,23 +278,11 @@ if __name__ == "__main__":
                     with torch.no_grad():
                         top_k = np.array(x.grad).argsort()[-5:][::-1]
                         data = x * 128.0 + 128.0
-                        data = data.int().numpy()
-                        for k in top_k:
-                            data[k] = 1
-                        str_len = np.where(data != 0)[0][-1] + 1
-                        sock.sendall(bytearray(data[:str_len].tolist()))
-                        code, hbn = [int(x) for x in sock.recv(16).strip().decode("utf-8").split(":")[:2]]
-                        if hbn > 0:
-                            if not code:
-                                g_interests.append(bytearray(data[:str_len].tolist()))
-                            else:
-                                g_crashes.append(bytearray(data[:str_len].tolist()))
-
-                print("[+] GENERATED %d interest - %d crashes" % (len(g_interests), len(g_crashes)))
-
-                ## Write to in_dir and resume AFL 
-                if len(g_interests) + len(g_crashes) > 0:
-                    pass
+                        M.mutate(data.int().numpy(), top_k, sub_stat, stats, target_branches)
+                        #  data = data.int().numpy()
+                        #  str_len = np.where(data != 0)[0][-1] + 1
+                        #  sock.sendall(bytearray(data[:str_len].tolist()))
+                        #  code, hbn = [int(x) for x in sock.recv(16).strip().decode("utf-8").split(":")[:2]]
 
                 ## Update number of testcases
                 n_testcases = len(testcases)

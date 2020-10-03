@@ -20,3 +20,6 @@ test: libcmpcov.a libllvmrt.a test.c
 
 clean:
 	rm -f *.so *.o *.a fuzzer
+
+dev:
+	./sneu.py -i ../in/ -o ../out/ -b ../bin/ -p programs/example/
