@@ -22,8 +22,9 @@ from mod.config import Config
 def main(argv):
     config = Config(argv[1:])
     Instrument(config)
-    #  loader = DataLoader(config)
-    #  loader.inc("fuzzer01")
+    loader = DataLoader(config)
+    loader.inc("fuzzer01")
+    loader.uncovered_branches()
 
 if __name__ == "__main__":
     main(sys.argv)

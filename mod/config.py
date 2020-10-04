@@ -19,6 +19,7 @@ class Config:
         assert self.proj, "[x] Require -p"
         assert self.bin_dir, "[x] Require -b"
 
-        self.pwd = os.path.dirname(os.path.realpath(__file__))
+        pwd = os.path.dirname(os.path.realpath(__file__))
+        self.pwd = os.path.join(pwd, "../")
         self.target_afl = "target_afl"
         self.target_sneu = "target_sneu"
