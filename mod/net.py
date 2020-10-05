@@ -8,8 +8,8 @@ class Net(nn.Module):
     def __init__(self, d_in, d_out):
         super(Net, self).__init__()
         self.fc1 = nn.Linear(d_in, d_in)
-        self.fc2 = nn.Linear(d_in, 32)
-        self.fc3 = nn.Linear(32, d_out)
+        self.fc2 = nn.Linear(d_in, 8)
+        self.fc3 = nn.Linear(8, d_out)
 
     def forward(self, x):
         x = torch.relu(self.fc1(x))

@@ -17,8 +17,10 @@ class DataLoader:
         self.negative = set()
         self.branch_ids = set()
         self.zeros = set()
+        self.type_sizes = dict()
 
-    def update(self, branch_id, signed_distance):
+    def update(self, type_size, branch_id, signed_distance):
+        self.type_sizes[branch_id] = type_size
         if not signed_distance:
             self.zeros.add(branch_id)
         elif signed_distance > 0:
@@ -26,23 +28,49 @@ class DataLoader:
         else:
             self.negative.add(branch_id)
 
+    def mutate(self, data, branch, branch_ids):
+        # if this data contains our exepected branch ids
+        # TODO: goal generate as much as possible
+        dataset = []
+        if set(branch_ids).intersection(branch.keys()):
+            dataset.append((data, branch))
+            for step in range(1,2):
+                for idx in range(len(data)):
+                    new_data = data[:idx] + bytes([(data[idx] + step) % 255]) + data[idx + 1:]
+                    cov = self.cov_parser.parse(new_data)
+                    new_branch = {}
+                    for type_size, branch_id, left_value, right_value in cov:
+                        new_branch[branch_id] = (type_size, left_value, right_value)
+                    # covered branch ids are unchanged
+                    if new_branch.keys() == branch.keys():
+                        for branch_id in branch_ids:
+                            if branch_id in branch and branch_id in new_branch:
+                                distance = abs(branch[branch_id][1] - branch[branch_id][2])
+                                new_distance = abs(new_branch[branch_id][1] - new_branch[branch_id][2])
+                                if distance != new_distance:
+                                    print(new_distance)
+                                    print(new_data)
+                                    dataset.append((new_data, new_branch))
+        return dataset
+
     def create_dataset(self):
         ret = []
         branch_ids = self.uncovered_branch_ids()
         for data, branch in self.dataset:
-            label = np.zeros(len(branch_ids))
-            input = np.zeros(self.max_len)
-            for idx, branch_id in enumerate(branch_ids):
-                if branch_id in branch:
-                    left_value, right_value = branch[branch_id][1:]
-                    label[idx] = abs(left_value - right_value)
-            for idx, val in enumerate(bytearray(data)):
-                input[idx] = val
-            input = (input - 128.0) / 128.0 # [-1, 1]
-            input = torch.tensor(input).float()
-            label = np.clip(label / 255.0, 0, 1.0) # [0, 1]
-            label = torch.tensor(label).float()
-            ret.append((input, label))
+            for data, branch in self.mutate(data, branch, branch_ids):
+                label = np.zeros(len(branch_ids))
+                input = np.zeros(self.max_len)
+                for idx, branch_id in enumerate(branch_ids):
+                    if branch_id in branch:
+                        left_value, right_value = branch[branch_id][1:]
+                        label[idx] = abs(left_value - right_value)
+                for idx, val in enumerate(bytearray(data)):
+                    input[idx] = val
+                input = (input - 128.0) / 128.0 # [-1, 1]
+                input = torch.tensor(input).float()
+                label = np.clip(label / 255.0, 0, 1.0) # [0, 1]
+                label = torch.tensor(label).float()
+                ret.append((input, label))
         return ret
 
     def uncovered_branch_ids(self):
@@ -51,7 +79,7 @@ class DataLoader:
         zeros = self.zeros - self.positive - self.negative
         uncovered = list(positive) + list(negative) + list(zeros)
         return uncovered
-
+    
     def inc(self, fuzzer_name):
         queue_dir = os.path.join(self.config.out_dir, fuzzer_name, "queue/")
         if os.path.exists(queue_dir):
@@ -62,7 +90,7 @@ class DataLoader:
                 cov = self.cov_parser.parse(data)
                 branch = {}
                 for type_size, branch_id, left_value, right_value in cov:
-                    self.update(branch_id, left_value - right_value)
+                    self.update(type_size, branch_id, left_value - right_value)
                     branch[branch_id] = (type_size, left_value, right_value)
                     self.branch_ids.add(branch_id)
                 self.dataset.append((data, branch))
