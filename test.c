@@ -12,6 +12,11 @@ int main(int argc, char **argv) {
   if (data[3] != 'r') return 1;
   if (data[4] != 't') return 1;
   if (data[5] != 'y') return 1;
+  if (data[6] != '1') return 1;
+  if (data[7] != '1') return 1;
+  if (data[8] != '1') return 1;
+  if (data[9] != '1') return 1;
+  if (data[10] != '1') return 1;
   abort();
   return 0;
 }
