@@ -40,8 +40,8 @@ class Trainer:
         self.optimizer.zero_grad()
         loss.backward()
         with torch.no_grad():
-            top_k = np.array(x.grad).argsort()[-k:][::-1]
-            print(top_k)
+            topk = np.array(x.grad).argsort()[-k:][::-1]
+        return topk
 
     def train(self):
 

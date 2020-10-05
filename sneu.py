@@ -17,7 +17,7 @@ def main(argv):
     trainer = Trainer(dataset)
     trainer.train()
     for x, y in dataset:
-        top_k = trainer.topk(x, y)
+        topk = trainer.topk(x, y)
 
 if __name__ == "__main__":
     main(sys.argv)
