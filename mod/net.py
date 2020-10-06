@@ -33,21 +33,21 @@ class Trainer:
         temp = temp.type(torch.float)
         return 1 if temp.sum() == len(y) else 0
 
-    def topk(self, x, y, k=5):
+    def top_k(self, x, y, k=5):
         x.requires_grad = True
         y_pred = self.net(x)
         loss = self.loss_fn(y_pred, y)
         self.optimizer.zero_grad()
         loss.backward()
         with torch.no_grad():
-            topk = np.array(x.grad).argsort()[-k:][::-1]
-        return topk
+            top_k = np.array(x.grad).argsort()[-k:][::-1]
+        return top_k
 
     def train(self):
 
         for epoch in range(100):
             accuracy = 0
-            for (x, y) in self.dataset:
+            for (x, y, _) in self.dataset:
                 y_pred = self.net(x)
                 loss = self.loss_fn(y_pred, y)
                 self.optimizer.zero_grad()

@@ -3,6 +3,7 @@
 
 import sys
 import os
+import time
 
 from mod.instrument import Instrument
 from mod.dataloader import DataLoader
@@ -15,19 +16,20 @@ def main(argv):
     Instrument(config)
     loader = DataLoader(config)
     fuzzer = Fuzzer(config)
-    fuzzer.serve()
+    fuzzer.wake_up()
 
-    extra = loader.incremental_load("fuzzer01")
-    fuzzer.sync_all(extra)
+    while True:
+        batch = loader.incremental_load("fuzzer01")
+        fuzzer.sync_all(batch)
+        dataset, profile = loader.create_dataset()
 
-    dataset = loader.create_dataset()
-    trainer = Trainer(dataset)
-    trainer.train()
+        if len(dataset):
+            trainer = Trainer(dataset)
+            trainer.train()
 
-    for idx, (x, y) in enumerate(dataset):
-        topk = trainer.topk(x, y)
-        print(topk)
-    os.wait()
+            for idx, (x, y, data) in enumerate(dataset):
+                top_k = trainer.top_k(x, y)[:1]
+                fuzzer.mutate(data, top_k, profile)
 
 if __name__ == "__main__":
     main(sys.argv)

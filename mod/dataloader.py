@@ -29,8 +29,10 @@ class DataLoader:
             self.negative.add(branch_id)
 
     def create_dataset(self):
+        profile = set() 
         ret = []
         branch_ids = self.uncovered_branch_ids()
+        print("[+] Loader: found %d uncovered branches" % len(branch_ids))
         for data, branch in self.dataset:
             label = np.zeros(len(branch_ids))
             input = np.zeros(self.max_len)
@@ -38,14 +40,15 @@ class DataLoader:
                 if branch_id in branch:
                     left_value, right_value = branch[branch_id][1:]
                     label[idx] = abs(left_value - right_value)
+                    profile.add(left_value ^ right_value)
             for idx, val in enumerate(bytearray(data)):
                 input[idx] = val
             input = (input - 128.0) / 128.0 # [-1, 1]
             input = torch.tensor(input).float()
             label = np.clip(label / 255.0, 0, 1.0) # [0, 1]
             label = torch.tensor(label).float()
-            ret.append((input, label))
-        return ret
+            ret.append((input, label, data))
+        return ret, profile
 
     def uncovered_branch_ids(self):
         positive = self.positive - self.negative - self.zeros
@@ -60,6 +63,7 @@ class DataLoader:
         if os.path.exists(queue_dir):
             prev_size = len(self.dataset)
             testcases = sorted(glob.glob("%s/id:*" % queue_dir))[prev_size:]
+            print("[+] Loader: found %d testcases" % len(testcases))
             for testcase in testcases:
                 data = open(testcase, "rb").read()
                 cov = self.cov_parser.parse(data)
