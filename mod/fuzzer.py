@@ -13,16 +13,16 @@ class Fuzzer:
         self.last_id = 0
         self.workspace = os.path.join(self.config.out_dir, name)
         self.queue_dir = os.path.join(self.workspace, "queue")
-        if os.path.exists(self.config.out_dir):
-            shutil.rmtree(self.config.out_dir)
+        if os.path.exists(self.workspace):
+            shutil.rmtree(self.workspace)
         os.makedirs(self.queue_dir)
 
     def mutate(self, data, top_k, profile):
         last_id = self.last_id
         for pos in top_k:
-            pos = pos % len(data)
+            tmp = data + (pos - (len(data) - 1)) * b"\x00"
             for p in profile:
-                tmp = data[0:pos] + bytes([data[pos] ^ p % 256]) + data[pos + 1:]
+                tmp = tmp[0:pos] + bytes([tmp[pos] ^ p % 256]) + tmp[pos + 1:]
                 code, hbn = self.send_one(tmp)
                 if not code and hbn > 0:
                     self.last_id += 1
