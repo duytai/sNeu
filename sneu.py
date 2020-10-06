@@ -15,7 +15,7 @@ def main(argv):
     config = Config(argv[1:])
     Instrument(config)
     loader = DataLoader(config)
-    fuzzer = Fuzzer(config)
+    fuzzer = Fuzzer(config, "fuzzer02")
     fuzzer.wake_up()
 
     while True:

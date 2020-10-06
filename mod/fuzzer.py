@@ -8,10 +8,10 @@ import re
 import shutil
 
 class Fuzzer:
-    def __init__(self, config):
+    def __init__(self, config, name):
         self.config = config
         self.last_id = 0
-        self.workspace = os.path.join(self.config.out_dir, "fuzzer02")
+        self.workspace = os.path.join(self.config.out_dir, name)
         self.queue_dir = os.path.join(self.workspace, "queue")
         if os.path.exists(self.config.out_dir):
             shutil.rmtree(self.config.out_dir)
