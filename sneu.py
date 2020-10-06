@@ -18,18 +18,19 @@ def main(argv):
     fuzzer = Fuzzer(config, "fuzzer02")
     fuzzer.wake_up()
 
-    while True:
-        batch = loader.incremental_load("fuzzer01")
-        fuzzer.sync_all(batch)
-        dataset, profile = loader.create_dataset()
+    batch = loader.incremental_load("fuzzer01")
+    fuzzer.sync_all(batch)
+    dataset, profile = loader.create_dataset()
 
-        if len(dataset):
-            trainer = Trainer(dataset)
-            trainer.train()
+    if len(dataset):
+        trainer = Trainer(dataset)
+        trainer.train()
 
-            for idx, (x, y, data) in enumerate(dataset):
-                top_k = trainer.top_k(x, y)[:1]
-                fuzzer.mutate(data, top_k, profile)
+        for idx, (x, y, data) in enumerate(dataset):
+            top_k = trainer.top_k(x, y)
+            fuzzer.mutate(data, top_k, profile)
+
+    os.wait()
 
 if __name__ == "__main__":
     main(sys.argv)

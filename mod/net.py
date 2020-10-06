@@ -45,7 +45,7 @@ class Trainer:
 
     def train(self):
 
-        for epoch in range(100):
+        for epoch in range(20):
             accuracy = 0
             for (x, y, _) in self.dataset:
                 y_pred = self.net(x)
@@ -55,4 +55,6 @@ class Trainer:
                 self.optimizer.step()
                 with torch.no_grad():
                     accuracy += self.is_match(y, y_pred) / len(self.dataset) * 100
+            print("[+] Trainer: epoch %f acc %f" % (epoch, accuracy), end="\r")
+        print("[+] Trainer: epoch %f acc %f" % (epoch, accuracy))
 

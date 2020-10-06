@@ -33,6 +33,7 @@ class DataLoader:
         ret = []
         branch_ids = self.uncovered_branch_ids()
         print("[+] Loader: found %d uncovered branches" % len(branch_ids))
+        print("[+] Loader: input_size: %d" % self.max_len)
         for data, branch in self.dataset:
             label = np.zeros(len(branch_ids))
             input = np.zeros(self.max_len)
@@ -64,7 +65,8 @@ class DataLoader:
             prev_size = len(self.dataset)
             testcases = sorted(glob.glob("%s/id:*" % queue_dir))[prev_size:]
             print("[+] Loader: found %d testcases" % len(testcases))
-            for testcase in testcases:
+            for idx, testcase in enumerate(testcases):
+                print("[+] Loader: parse %d-nth" % idx, end="\r")
                 data = open(testcase, "rb").read()
                 cov = self.cov_parser.parse(data)
                 branch = {}

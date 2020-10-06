@@ -19,6 +19,9 @@ class Fuzzer:
 
     def mutate(self, data, top_k, profile):
         last_id = self.last_id
+        print(data)
+        print(top_k)
+        print("---")
         for pos in top_k:
             tmp = data + (pos - (len(data) - 1)) * b"\x00"
             for p in profile:
