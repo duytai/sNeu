@@ -19,6 +19,9 @@ make
 mkdir in/ out/ bin/
 echo "{}" > in/1.txt
 
-# fuzz the example program
+# mutate testcases with Neural Network
 ./sneu.py -i in/ -o out/ -b bin/ -p programs/example/
+
+# run AFL in master-slave mode
+afl-fuzz -i in/ -o out/ -M fuzzer01 bin/target_afl
 ```
