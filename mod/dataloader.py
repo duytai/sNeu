@@ -58,8 +58,8 @@ class DataLoader:
         uncovered = list(positive) + list(negative) + list(zeros)
         return uncovered
     
-    def incremental_load(self, fuzzer_name):
-        queue_dir = os.path.join(self.config.out_dir, fuzzer_name, "queue/")
+    def incremental_load(self):
+        queue_dir = os.path.join(self.config.out_dir, self.config.master, "queue/")
         if os.path.exists(queue_dir):
             prev_size = len(self.dataset)
             testcases = sorted(glob.glob("%s/id:*" % queue_dir))[prev_size:]

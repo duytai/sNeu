@@ -334,6 +334,18 @@ static void sync_bitmap(char* queue_dir) {
   memset(virgin_bits, 255, MAP_SIZE);
   cur_cnt = scandir(queue_dir, &nl, NULL, alphasort);
 
+  if (getenv("SKIP_WATCH")) {
+    printf("[+] Start syncing with master\n");
+    for (int i = 0; i < cur_cnt; i++) {
+      char fn[255];
+      sprintf(fn, "%s/%s", queue_dir, nl[i]->d_name);
+      run_one(fn);
+      free(nl[i]);
+    }
+    free(nl);
+    return;
+  }
+
   while (1) {
     new_cnt = scandir(queue_dir, &nl, NULL, alphasort);
     if (cur_cnt == -1 && new_cnt != -1) {

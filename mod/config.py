@@ -23,3 +23,5 @@ class Config:
         self.pwd = os.path.join(pwd, "../")
         self.target_afl = "target_afl"
         self.target_sneu = "target_sneu"
+        self.master = "fuzzer01"
+        self.slave = "fuzzer02"

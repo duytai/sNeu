@@ -12,27 +12,29 @@ from mod.net import Trainer
 from mod.fuzzer import Fuzzer
 
 def main(argv):
-    master = "fuzzer01"
-    slave = "fuzzer02"
 
     config = Config(argv[1:])
     Instrument(config)
     loader = DataLoader(config)
-    fuzzer = Fuzzer(config, master, slave)
+    fuzzer = Fuzzer(config)
     fuzzer.wake_up()
 
-    batch = loader.incremental_load(master)
+    batch = loader.incremental_load()
     dataset, profile = loader.create_dataset()
-
-    print(profile);
 
     if len(dataset):
         trainer = Trainer(dataset)
         trainer.train()
 
+        ins = []
+        outs = []
+
         for idx, (x, y, data) in enumerate(dataset):
             top_k = trainer.top_k(x, y)
-            print(top_k)
+            ins.append(data)
+            outs.append(top_k)
+
+        fuzzer.mutate(ins, outs, profile)
 
     os.wait()
 
