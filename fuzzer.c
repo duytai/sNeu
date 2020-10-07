@@ -14,6 +14,7 @@
 #include <stdint.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <sys/inotify.h>
 
 #define MAP_SIZE 1 << 16
 #define FORKSRV_FD 198
@@ -28,6 +29,7 @@
   __asm__ volatile("" ::: "memory")
 #define likely(_x)   __builtin_expect(!!(_x), 1)
 #define unlikely(_x)  __builtin_expect(!!(_x), 0)
+#define BUF_LEN (10 * (sizeof(struct inotify_event) + 1024 + 1))
 
 enum {
   /* 00 */ FAULT_NONE,
@@ -303,6 +305,81 @@ static void server_up(void) {
   close(server_fd);
 }
 
+static void run_one(char* fn) {
+  struct stat st;
+
+  if (lstat(fn, &st) || access(fn, R_OK)) return;
+  if (!S_ISREG(st.st_mode) || !st.st_size) return;
+
+  char used_mem[st.st_size];
+  int fd = open(fn, O_RDONLY);
+
+  if (fd < 0) fatal("open() failed");
+  if (read(fd, used_mem, st.st_size) != st.st_size)
+    fatal("read() failed");
+  close(fd);
+
+  run_target(used_mem, st.st_size);
+  printf("[+] Sync %s\n", fn);
+}
+
+static void sync_bitmap(char* queue_dir) {
+  int inotify_fd, wd, cur_cnt, new_cnt;
+  char buf[BUF_LEN], *p;
+  ssize_t num_read;
+
+  struct inotify_event *event;
+  struct dirent **nl;
+
+  memset(virgin_bits, 255, MAP_SIZE);
+  cur_cnt = scandir(queue_dir, &nl, NULL, alphasort);
+
+  while (1) {
+    new_cnt = scandir(queue_dir, &nl, NULL, alphasort);
+    if (cur_cnt == -1 && new_cnt != -1) {
+      cur_cnt = new_cnt;
+      continue;
+    }
+    if (cur_cnt != -1 && new_cnt != -1) {
+      if (cur_cnt != new_cnt) {
+        printf("[+] Start syncing with master\n");
+        for (int i = 0; i < new_cnt; i++) {
+          char fn[255];
+          sprintf(fn, "%s/%s", queue_dir, nl[i]->d_name);
+          run_one(fn);
+        }
+        break;
+      }
+    }
+    sleep(1);
+  }
+
+  free(nl);
+
+  inotify_fd = inotify_init();
+  if (inotify_fd < 0) fatal("inotify_init() failed");
+  wd = inotify_add_watch(inotify_fd, queue_dir, IN_ALL_EVENTS);
+  if (wd < 0) fatal("watch() failed");
+
+  for (;;) {                                  /* Read events forever */
+    num_read = read(inotify_fd, buf, BUF_LEN);
+    if (num_read < 0) fatal("read() failed");
+    for (p = buf; p < buf + num_read; ) {
+      event = (struct inotify_event *) p;
+      if (event->mask & IN_IGNORED) {
+        sync_bitmap(queue_dir);
+        return;
+      } 
+      if (event->mask & IN_CLOSE_WRITE) {
+        char fn[255];
+        sprintf(fn, "%s/%s", queue_dir, event->name);
+        run_one(fn);
+      }
+      p += sizeof(struct inotify_event) + event->len;
+    }
+  }
+}
+
 static void usage(char* name) {
   printf("Usage: %s /path/to/fuzzed_app\n", name);
   exit(EXIT_SUCCESS);
@@ -324,7 +401,9 @@ int main(int argv, char** argc) {
   init_count_class16();
   setup_signal_handlers();
   init_forkserver(target_path);
-  server_up();
+  
+  sync_bitmap("/root/out/fuzzer01/queue");
+  // server_up();
 
   return 0;
 }
