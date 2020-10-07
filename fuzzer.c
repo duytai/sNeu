@@ -43,8 +43,46 @@ static int out_fd, dev_null_fd, child_timed_out, total_execs;
 static uint8_t* trace_bits;
 static uint8_t virgin_bits[MAP_SIZE];
 
+static const uint8_t count_class_lookup8[256] = {
+  [0]           = 0,
+  [1]           = 1,
+  [2]           = 2,
+  [3]           = 4,
+  [4 ... 7]     = 8,
+  [8 ... 15]    = 16,
+  [16 ... 31]   = 32,
+  [32 ... 127]  = 64,
+  [128 ... 255] = 128
+};
+
+static uint16_t count_class_lookup16[65536];
+
+static void init_count_class16(void) {
+  uint32_t b1, b2;
+  for (b1 = 0; b1 < 256; b1++)
+    for (b2 = 0; b2 < 256; b2++)
+      count_class_lookup16[(b1 << 8) + b2] =
+        (count_class_lookup8[b1] << 8) |
+        count_class_lookup8[b2];
+}
+
+static void classify_counts(uint64_t* mem) {
+  uint32_t i = MAP_SIZE >> 3;
+  while (i--) {
+    /* Optimize for sparse bitmaps. */
+    if (unlikely(*mem)) {
+      uint16_t * mem16 = (uint16_t*)mem;
+      mem16[0] = count_class_lookup16[mem16[0]];
+      mem16[1] = count_class_lookup16[mem16[1]];
+      mem16[2] = count_class_lookup16[mem16[2]];
+      mem16[3] = count_class_lookup16[mem16[3]];
+    }
+    mem++;
+  }
+}
+
 static void fatal(char* msg) {
-  fprintf(stderr, "%s", msg);
+  fprintf(stderr, "%s\n", msg);
   exit(EXIT_FAILURE);
 }
 
@@ -215,6 +253,7 @@ static int run_target(char* used_mem, int len) {
   prev_timed_out = child_timed_out;
   total_execs ++;
   MEM_BARRIER();
+  classify_counts((uint64_t*) trace_bits);
 
   if (WIFSIGNALED(status)) {
     kill_signal = WTERMSIG(status);
@@ -282,6 +321,7 @@ int main(int argv, char** argc) {
   if (dev_null_fd < 0) fatal("Unable to open /dev/null");
 
   setup_shm();
+  init_count_class16();
   setup_signal_handlers();
   init_forkserver(target_path);
   server_up();
