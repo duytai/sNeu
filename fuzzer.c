@@ -381,14 +381,15 @@ static void sync_bitmap(char* queue_dir) {
 }
 
 static void usage(char* name) {
-  printf("Usage: %s /path/to/fuzzed_app\n", name);
+  printf("Usage: %s /path/to/fuzzed_app /path/to/queue \n", name);
   exit(EXIT_SUCCESS);
 }
 
 int main(int argv, char** argc) {
 
-  if (argv < 2) usage(argc[0]);
+  if (argv < 3) usage(argc[0]);
   char* target_path = argc[1];
+  char* target_queue = argc[2];
 
   unlink(".cur_input");
   out_fd = open(".cur_input", O_RDWR | O_CREAT | O_EXCL, 0600);
@@ -402,8 +403,11 @@ int main(int argv, char** argc) {
   setup_signal_handlers();
   init_forkserver(target_path);
   
-  sync_bitmap("/root/out/fuzzer01/queue");
-  // server_up();
-
+  int sync_pid = fork();
+  if (!sync_pid) {
+    sync_bitmap(target_queue);
+    return 0;
+  }
+  server_up();
   return 0;
 }

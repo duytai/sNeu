@@ -59,7 +59,6 @@ class DataLoader:
         return uncovered
     
     def incremental_load(self, fuzzer_name):
-        ret = []
         queue_dir = os.path.join(self.config.out_dir, fuzzer_name, "queue/")
         if os.path.exists(queue_dir):
             prev_size = len(self.dataset)
@@ -76,5 +75,3 @@ class DataLoader:
                     self.branch_ids.add(branch_id)
                 self.dataset.append((data, branch))
                 self.max_len = max(len(data), self.max_len)
-                ret.append(data)
-        return ret
