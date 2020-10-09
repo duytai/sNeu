@@ -26,6 +26,7 @@ void setup_signal_handlers() {
 
 int main(int argc, char* argv[]) {
   char* input = "hello world";
+  u32 exec_tmout = EXEC_TIMEOUT;
   setup_signal_handlers();
 
   fuzzer.parse_arguments(argc, argv);
@@ -33,4 +34,6 @@ int main(int argc, char* argv[]) {
   fuzzer.setup_shm();
   fuzzer.init_forkserver();
   fuzzer.write_to_testcase(input, strlen(input));
+  u8 v = fuzzer.run_target(exec_tmout);
+  OKF("V is %d", v);
 }

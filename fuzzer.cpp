@@ -12,6 +12,16 @@
 #include <string>
 
 #include "fuzzer.h"
+#include "bitmap.h"
+
+enum {
+  /* 00 */ FAULT_NONE,
+  /* 01 */ FAULT_TMOUT,
+  /* 02 */ FAULT_CRASH,
+  /* 03 */ FAULT_ERROR,
+  /* 04 */ FAULT_NOINST,
+  /* 05 */ FAULT_NOBITS
+};
 
 void Fuzzer::setup_fds(void) {
   unlink(this->out_file);
@@ -141,6 +151,54 @@ void Fuzzer::write_to_testcase(char* mem, u32 len) {
   if (write(this->out_fd, mem, len) != len) PFATAL("write() failed");
   if (ftruncate(this->out_fd, len)) PFATAL("ftruncate() failed");
   lseek(this->out_fd, 0, SEEK_SET);
+}
+
+u8 Fuzzer::run_target(u32 exec_tmout) {
+
+  static struct itimerval it;
+  static int prev_timed_out = 0;
+  int status, res, kill_signal;
+
+  memset(this->trace_bits, 0, MAP_SIZE);
+  MEM_BARRIER();
+  this->child_timed_out = 0;
+
+  if ((res = write(this->fsrv_ctl_fd, &prev_timed_out, 4)) != 4) {
+    FATAL("Unable to request new process from fork server (OOM?)");
+  }
+  if ((res = read(this->fsrv_st_fd, &this->child_pid, 4)) != 4) {
+    FATAL("Unable to request new process from fork server (OOM?)");
+  }
+  if (this->child_pid <= 0) FATAL("Fork server is misbehaving (OOM?)");
+
+  it.it_value.tv_sec = (exec_tmout / 1000);
+  it.it_value.tv_usec = (exec_tmout % 1000) * 1000;
+  setitimer(ITIMER_REAL, &it, NULL);
+
+  if ((res = read(this->fsrv_st_fd, &status, 4)) != 4) { // get return status
+    FATAL("Unable to communicate with fork server (OOM?)");
+  }
+
+  if (!WIFSTOPPED(status)) this->child_pid = 0;
+
+  getitimer(ITIMER_REAL, &it);
+  it.it_value.tv_sec = 0;
+  it.it_value.tv_usec = 0;
+  setitimer(ITIMER_REAL, &it, NULL);
+
+  prev_timed_out = this->child_timed_out;
+  this->total_execs ++;
+  MEM_BARRIER();
+  classify_counts((u64*) this->trace_bits);
+
+  if (WIFSIGNALED(status)) {
+    kill_signal = WTERMSIG(status);
+    if (this->child_timed_out && kill_signal == SIGKILL) return FAULT_TMOUT;
+    return FAULT_CRASH;
+  }
+  OKF("hbn = %d\n", has_new_bits(this->virgin_bits, this->trace_bits));
+
+  return FAULT_NONE;
 }
 
 Fuzzer::~Fuzzer() {

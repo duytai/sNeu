@@ -1,6 +1,6 @@
 
 CXX = clang++
-CXXFLAGS += -Wno-pointer-sign -Wno-write-strings
+CXXFLAGS += -Wno-pointer-sign -Wno-write-strings -Wc99-designator
 
 target=bin/fuzzer
 
