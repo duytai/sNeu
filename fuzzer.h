@@ -34,8 +34,10 @@ class Fuzzer {
     void setup_fds(void);
     void remove_shm(void);
     void setup_shm(void);
-    void init_forkserver(void);
     void parse_arguments(int argc, char** argv);
+    void init_forkserver(void);
+    void write_to_testcase(char* mem, u32 len);
+    u8 run_target(void);
 };
 
 #endif

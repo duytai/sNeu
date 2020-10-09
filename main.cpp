@@ -24,16 +24,13 @@ void setup_signal_handlers() {
   sigaction(SIGALRM, &sa, NULL);
 }
 
-void show_usage(char* name) {
-  SAYF("Usage: %s -i <in_dir> <app>\n", name);
-  exit(EXIT_SUCCESS);
-}
-
 int main(int argc, char* argv[]) {
+  char* input = "hello world";
   setup_signal_handlers();
 
   fuzzer.parse_arguments(argc, argv);
   fuzzer.setup_fds();
   fuzzer.setup_shm();
   fuzzer.init_forkserver();
+  fuzzer.write_to_testcase(input, strlen(input));
 }

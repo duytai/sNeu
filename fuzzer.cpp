@@ -65,9 +65,15 @@ void Fuzzer::parse_arguments(int argc, char* argv[]) {
   }
 
   this->target_argv = argv + i;
+
+  if (this->in_dir == NULL || this->target_argv[0] == NULL) {
+    SAYF("  Usage: %s <in_dir> <app>\n", argv[0]);
+    exit(EXIT_SUCCESS);
+  }
 }
 
 void Fuzzer::init_forkserver(void) {
+
   static struct itimerval it;
   int st_pipe[2], ctl_pipe[2];
   int status, rlen;
@@ -84,8 +90,12 @@ void Fuzzer::init_forkserver(void) {
     dup2(this->dev_null_fd, 1);
     dup2(this->dev_null_fd, 2);
 
-    dup2(this->out_fd, 0);
-    close(this->out_fd);
+    if (this->use_stdin) {
+      dup2(this->out_fd, 0);
+      close(this->out_fd);
+    } else {
+      dup2(this->dev_null_fd, 0);
+    }
 
     if (dup2(ctl_pipe[0], FORKSRV_FD) < 0) PFATAL("dup2() failed");
     if (dup2(st_pipe[1], FORKSRV_FD + 1) < 0) PFATAL("dup2() failed");
@@ -118,12 +128,19 @@ void Fuzzer::init_forkserver(void) {
   setitimer(ITIMER_REAL, &it, NULL);
 
   if (rlen == 4) {
-    OKF("All right - fork server is up.\n");
+    OKF("All right - fork server is up.");
     return;
   }
 
   if (waitpid(this->forksrv_pid, &status, 0) <= 0) PFATAL("waitpid() failed");
   PFATAL("Fork server handshake failed");
+}
+
+void Fuzzer::write_to_testcase(char* mem, u32 len) {
+  lseek(this->out_fd, 0, SEEK_SET);
+  if (write(this->out_fd, mem, len) != len) PFATAL("write() failed");
+  if (ftruncate(this->out_fd, len)) PFATAL("ftruncate() failed");
+  lseek(this->out_fd, 0, SEEK_SET);
 }
 
 Fuzzer::~Fuzzer() {
