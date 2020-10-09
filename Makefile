@@ -1,11 +1,17 @@
 
-CXX= clang++
-CXXFLAGS += -Wno-pointer-sign -pedantic
+CXX = clang++
+CXXFLAGS += -Wno-pointer-sign -Wno-write-strings
 
-all: fuzzer
+target=bin/fuzzer
 
-fuzzer: fuzzer.cpp
-	$(CXX) -o $@ $^ -fsanitize=address $(CXXFLAGS)
+all: main
+
+%.o: %.cpp
+	$(CXX) -c -o $@ $< $(CXXFLAGS)
+
+main: main.cpp fuzzer.o
+	@mkdir -p bin/
+	$(CXX) -o $(target) $^ -fsanitize=address $(CXXFLAGS)
 
 clean:
-	rm -f fuzzer
+	@rm -rf bin/ *.o $(target)
