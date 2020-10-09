@@ -5,6 +5,7 @@ CXXFLAGS += -Wno-pointer-sign -Wno-write-strings
 target=bin/fuzzer
 
 all: main
+	(cd bin/ && ./fuzzer)
 
 %.o: %.cpp
 	$(CXX) -c -o $@ $< $(CXXFLAGS)

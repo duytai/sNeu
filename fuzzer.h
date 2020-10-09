@@ -24,9 +24,11 @@ class Fuzzer {
     u64 total_execs;
 
   public:
+    ~Fuzzer();
+    void handle_timeout(void);
     void setup_fds(void);
+    void remove_shm(void);
     void setup_shm(void);
-    void setup_signal_handlers(void);
     void init_forkserver(void);
 };
 
