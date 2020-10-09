@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <signal.h>
+#include <string.h>
 
 Fuzzer fuzzer;
 
@@ -23,8 +24,16 @@ void setup_signal_handlers() {
   sigaction(SIGALRM, &sa, NULL);
 }
 
-int main() {
+void show_usage(char* name) {
+  SAYF("Usage: %s -i <in_dir> <app>\n", name);
+  exit(EXIT_SUCCESS);
+}
+
+int main(int argc, char* argv[]) {
   setup_signal_handlers();
+
+  fuzzer.parse_arguments(argc, argv);
   fuzzer.setup_fds();
   fuzzer.setup_shm();
+  fuzzer.init_forkserver();
 }

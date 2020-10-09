@@ -23,6 +23,11 @@ class Fuzzer {
       
     u64 total_execs;
 
+    bool use_stdin = true;
+    char * out_file = ".cur_input",
+         * in_dir,
+         ** target_argv;
+
   public:
     ~Fuzzer();
     void handle_timeout(void);
@@ -30,6 +35,7 @@ class Fuzzer {
     void remove_shm(void);
     void setup_shm(void);
     void init_forkserver(void);
+    void parse_arguments(int argc, char** argv);
 };
 
 #endif

@@ -5,7 +5,7 @@ CXXFLAGS += -Wno-pointer-sign -Wno-write-strings
 target=bin/fuzzer
 
 all: main
-	(cd bin/ && ./fuzzer)
+	cd bin/ && ./fuzzer -i /root/neuzz/programs/nm/neuzz_in /root/neuzz/programs/nm/nm-new -C @@
 
 %.o: %.cpp
 	$(CXX) -c -o $@ $< $(CXXFLAGS)
