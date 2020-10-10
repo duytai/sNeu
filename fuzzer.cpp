@@ -6,13 +6,13 @@
 #include <sys/shm.h>
 #include <string.h>
 #include <signal.h>
+#include <math.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <string>
 
 #include "fuzzer.h"
-#include "bitmap.h"
 
 enum {
   /* 00 */ FAULT_NONE,
@@ -22,6 +22,9 @@ enum {
   /* 04 */ FAULT_NOINST,
   /* 05 */ FAULT_NOBITS
 };
+
+Fuzzer::Fuzzer(void) {
+}
 
 void Fuzzer::setup_fds(void) {
   unlink(this->out_file);
@@ -189,14 +192,12 @@ u8 Fuzzer::run_target(u32 exec_tmout) {
   prev_timed_out = this->child_timed_out;
   this->total_execs ++;
   MEM_BARRIER();
-  classify_counts((u64*) this->trace_bits);
 
   if (WIFSIGNALED(status)) {
     kill_signal = WTERMSIG(status);
     if (this->child_timed_out && kill_signal == SIGKILL) return FAULT_TMOUT;
     return FAULT_CRASH;
   }
-  OKF("hbn = %d\n", has_new_bits(this->virgin_bits, this->trace_bits));
 
   return FAULT_NONE;
 }

@@ -19,8 +19,20 @@ class Fuzzer {
 
     u8 child_timed_out,
       virgin_bits[MAP_SIZE],
-      * trace_bits;
-      
+      * trace_bits,
+      count_class_lookup8[256] = {
+        [0]           = 0,
+        [1]           = 1,
+        [2]           = 2,
+        [3]           = 4,
+        [4 ... 7]     = 8,
+        [8 ... 15]    = 16,
+        [16 ... 31]   = 32,
+        [32 ... 127]  = 64,
+        [128 ... 255] = 128
+      };
+
+    u16 count_class_lookup16[65536];
     u64 total_execs;
 
     bool use_stdin = true;
@@ -29,6 +41,7 @@ class Fuzzer {
          ** target_argv;
 
   public:
+    Fuzzer();
     ~Fuzzer();
     void handle_timeout(void);
     void setup_fds(void);
