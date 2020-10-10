@@ -14,6 +14,8 @@
 
 #include "fuzzer.h"
 
+/* X86 only */
+
 enum {
   /* 00 */ FAULT_NONE,
   /* 01 */ FAULT_TMOUT,
@@ -24,12 +26,45 @@ enum {
 };
 
 Fuzzer::Fuzzer(void) {
+  this->init_count_class16();
+  this->setup_fds();
+  this->setup_shm();
+}
+
+void Fuzzer::load_opt(FuzzerOpt opt) {
+  this->opt = opt;
+  this->init_forkserver();
+}
+
+void Fuzzer::classify_counts() {
+  u64* mem = (u64*) this->trace_bits;
+  u32 i = MAP_SIZE >> 3;
+  while (i--) {
+    /* Optimize for sparse bitmaps. */
+    if (unlikely(*mem)) {
+      u16* mem16 = (u16*)mem;
+      mem16[0] = count_class_lookup16[mem16[0]];
+      mem16[1] = count_class_lookup16[mem16[1]];
+      mem16[2] = count_class_lookup16[mem16[2]];
+      mem16[3] = count_class_lookup16[mem16[3]];
+    }
+    mem++;
+  }
+}
+
+void Fuzzer::init_count_class16(void) {
+  u32 b1, b2;
+  for (b1 = 0; b1 < 256; b1++)
+    for (b2 = 0; b2 < 256; b2++)
+      this->count_class_lookup16[(b1 << 8) + b2] =
+        (this->count_class_lookup8[b1] << 8) |
+        this->count_class_lookup8[b2];
 }
 
 void Fuzzer::setup_fds(void) {
-  unlink(this->out_file);
-  this->out_fd = open(this->out_file, O_RDWR | O_CREAT | O_EXCL, 0600);
-  if (this->out_fd < 0) PFATAL("Unable to create '%s'", this->out_file);
+  unlink(this->opt.out_file);
+  this->out_fd = open(this->opt.out_file, O_RDWR | O_CREAT | O_EXCL, 0600);
+  if (this->out_fd < 0) PFATAL("Unable to create '%s'", this->opt.out_file);
 
   this->dev_null_fd = open("/dev/null", O_RDWR);
   if (this->dev_null_fd < 0) PFATAL("Unable to open /dev/null");
@@ -61,30 +96,6 @@ void Fuzzer::handle_timeout(void) {
   }
 }
 
-void Fuzzer::parse_arguments(int argc, char* argv[]) {
-  int i = 1;
-
-  if (strcmp(argv[argc - 1], "@@") == 0) {
-    this->use_stdin = false;
-    argv[argc - 1] = this->out_file;
-  }
-
-  while (i < argc - 1) {
-    char* opt = argv[i];
-    if (strcmp(opt, "-i") == 0 && argv[i + 1] != NULL) {
-      this->in_dir = argv[i + 1];
-      i += 2;
-    } else break;
-  }
-
-  this->target_argv = argv + i;
-
-  if (this->in_dir == NULL || this->target_argv[0] == NULL) {
-    SAYF("  Usage: %s <in_dir> <app>\n", argv[0]);
-    exit(EXIT_SUCCESS);
-  }
-}
-
 void Fuzzer::init_forkserver(void) {
 
   static struct itimerval it;
@@ -103,7 +114,7 @@ void Fuzzer::init_forkserver(void) {
     dup2(this->dev_null_fd, 1);
     dup2(this->dev_null_fd, 2);
 
-    if (this->use_stdin) {
+    if (this->opt.use_stdin) {
       dup2(this->out_fd, 0);
       close(this->out_fd);
     } else {
@@ -118,7 +129,7 @@ void Fuzzer::init_forkserver(void) {
     close(st_pipe[0]);
     close(st_pipe[1]);
 
-    execv(this->target_argv[0], this->target_argv);
+    execv(this->opt.target_argv[0], this->opt.target_argv);
     exit(EXIT_SUCCESS);
   }
 
@@ -192,6 +203,7 @@ u8 Fuzzer::run_target(u32 exec_tmout) {
   prev_timed_out = this->child_timed_out;
   this->total_execs ++;
   MEM_BARRIER();
+  this->classify_counts();
 
   if (WIFSIGNALED(status)) {
     kill_signal = WTERMSIG(status);
@@ -200,6 +212,35 @@ u8 Fuzzer::run_target(u32 exec_tmout) {
   }
 
   return FAULT_NONE;
+}
+
+u8 Fuzzer::has_new_bits(void) {
+  u64* current = (u64*) trace_bits;
+  u64* virgin  = (u64*) this->virgin_bits;
+  u32 i = (MAP_SIZE >> 3);
+  u8 ret = 0;
+
+  while (i--) {
+    if (unlikely(*current) && unlikely(*current & *virgin)) {
+      if (likely(ret < 2)) {
+        u8* cur = (u8*)current;
+        u8* vir = (u8*)virgin;
+
+        /* Looks like we have not found any new bytes yet; see if any non-zero
+           bytes in current[] are pristine in virgin[]. */
+        if ((cur[0] && vir[0] == 0xff) || (cur[1] && vir[1] == 0xff) ||
+            (cur[2] && vir[2] == 0xff) || (cur[3] && vir[3] == 0xff) ||
+            (cur[4] && vir[4] == 0xff) || (cur[5] && vir[5] == 0xff) ||
+            (cur[6] && vir[6] == 0xff) || (cur[7] && vir[7] == 0xff)) ret = 2;
+        else ret = 1;
+      }
+      *virgin &= ~*current;
+    }
+    current++;
+    virgin++;
+  }
+
+  return ret;
 }
 
 Fuzzer::~Fuzzer() {

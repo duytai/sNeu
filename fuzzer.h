@@ -7,6 +7,13 @@
 #include "hash.h"
 #include "fuzzer.h"
 
+typedef struct {
+  bool use_stdin = true;
+  char* in_dir = NULL;
+  char* out_file = ".cur_input";
+  char** target_argv = NULL;
+} FuzzerOpt;
+
 class Fuzzer {
   private:
     s32 forksrv_pid,
@@ -34,22 +41,21 @@ class Fuzzer {
 
     u16 count_class_lookup16[65536];
     u64 total_execs;
-
-    bool use_stdin = true;
-    char * out_file = ".cur_input",
-         * in_dir,
-         ** target_argv;
+    FuzzerOpt opt;
 
   public:
     Fuzzer();
     ~Fuzzer();
+    void load_opt(FuzzerOpt opt);
+    void init_count_class16(void);
+    void classify_counts(void);
     void handle_timeout(void);
     void setup_fds(void);
     void remove_shm(void);
     void setup_shm(void);
-    void parse_arguments(int argc, char** argv);
     void init_forkserver(void);
     void write_to_testcase(char* mem, u32 len);
+    u8 has_new_bits(void);
     u8 run_target(u32 exec_tmout);
 };
 
