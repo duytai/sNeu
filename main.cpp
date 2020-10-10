@@ -1,6 +1,12 @@
 #include "fuzzer.h"
 #include "debug.h"
 
+#include <chrono>
+#include <vector>
+#include <algorithm>
+#include <string>
+#include <iostream>
+#include <filesystem>
 #include <stdio.h>
 #include <signal.h>
 #include <string.h>
@@ -9,6 +15,9 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+
+using namespace std;
+using namespace std::filesystem;
 
 Fuzzer fuzzer;
 
@@ -58,14 +67,31 @@ void setup_signal_handlers() {
 }
 
 int main(int argc, char* argv[]) {
-  char* input = "hello world";
+  auto opt = parse_arguments(argc, argv);
   u32 exec_tmout = EXEC_TIMEOUT;
   setup_signal_handlers();
-  fuzzer.load_opt(parse_arguments(argc, argv));
+  fuzzer.load_opt(opt);
 
-  fuzzer.write_to_testcase(input, strlen(input));
-  u8 v = fuzzer.run_target(exec_tmout);
-  OKF("V is %d", v);
-  OKF("new_bis: %d", fuzzer.has_new_bits());
-  OKF("new_bis: %d", fuzzer.has_new_bits());
+  vector<directory_entry> files(directory_iterator(opt.in_dir), directory_iterator());
+  sort(files.begin(), files.end());
+  OKF("TOTAL: %lu", files.size());
+  auto start = chrono::system_clock::now();
+
+  for (auto &file: files) {
+    if (file.is_regular_file() && file.file_size() > 0) {
+
+      char buffer[file.file_size()];
+      int fd = open(file.path().c_str(), O_RDONLY);
+      if ((size_t) read(fd, buffer, file.file_size()) != file.file_size())
+        PFATAL("read() failed");
+
+      fuzzer.write_to_testcase(buffer, file.file_size());
+      u8 ret = fuzzer.run_target(exec_tmout);
+      OKF("new_bit: %d", fuzzer.has_new_bits());
+    }
+  }
+
+  auto now = chrono::system_clock::now();
+  auto dur = chrono::duration_cast<chrono::seconds>(now - start);
+  OKF("Duration: %lu", dur.count());
 }
