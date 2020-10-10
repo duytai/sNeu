@@ -40,10 +40,12 @@ class Fuzzer {
       };
 
     u16 count_class_lookup16[65536];
-    u64 total_execs;
     FuzzerOpt opt;
 
   public:
+    u64 total_execs;
+    u64 exec_ms;
+
     Fuzzer();
     ~Fuzzer();
     void load_opt(FuzzerOpt opt);

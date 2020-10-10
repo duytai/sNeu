@@ -167,7 +167,7 @@ void Fuzzer::write_to_testcase(char* mem, u32 len) {
   lseek(this->out_fd, 0, SEEK_SET);
 }
 
-u8 Fuzzer::run_target(u32 exec_tmout) {
+u8 Fuzzer::run_target(u32 timeout) {
 
   static struct itimerval it;
   static int prev_timed_out = 0;
@@ -185,8 +185,8 @@ u8 Fuzzer::run_target(u32 exec_tmout) {
   }
   if (this->child_pid <= 0) FATAL("Fork server is misbehaving (OOM?)");
 
-  it.it_value.tv_sec = (exec_tmout / 1000);
-  it.it_value.tv_usec = (exec_tmout % 1000) * 1000;
+  it.it_value.tv_sec = (timeout / 1000);
+  it.it_value.tv_usec = (timeout % 1000) * 1000;
   setitimer(ITIMER_REAL, &it, NULL);
 
   if ((res = read(this->fsrv_st_fd, &status, 4)) != 4) { // get return status
@@ -196,6 +196,7 @@ u8 Fuzzer::run_target(u32 exec_tmout) {
   if (!WIFSTOPPED(status)) this->child_pid = 0;
 
   getitimer(ITIMER_REAL, &it);
+  this->exec_ms = (u64) timeout - (it.it_value.tv_sec * 1000 + it.it_value.tv_usec / 1000);
   it.it_value.tv_sec = 0;
   it.it_value.tv_usec = 0;
   setitimer(ITIMER_REAL, &it, NULL);

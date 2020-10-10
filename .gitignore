@@ -1,2 +1,4 @@
 *.o
 bin/
+example/
+.cur_input

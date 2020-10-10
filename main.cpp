@@ -1,7 +1,6 @@
 #include "fuzzer.h"
 #include "debug.h"
 
-#include <chrono>
 #include <vector>
 #include <algorithm>
 #include <string>
@@ -74,24 +73,17 @@ int main(int argc, char* argv[]) {
 
   vector<directory_entry> files(directory_iterator(opt.in_dir), directory_iterator());
   sort(files.begin(), files.end());
-  OKF("TOTAL: %lu", files.size());
-  auto start = chrono::system_clock::now();
 
   for (auto &file: files) {
     if (file.is_regular_file() && file.file_size() > 0) {
-
       char buffer[file.file_size()];
       int fd = open(file.path().c_str(), O_RDONLY);
       if ((size_t) read(fd, buffer, file.file_size()) != file.file_size())
         PFATAL("read() failed");
-
       fuzzer.write_to_testcase(buffer, file.file_size());
-      u8 ret = fuzzer.run_target(exec_tmout);
-      OKF("new_bit: %d", fuzzer.has_new_bits());
+      fuzzer.run_target(exec_tmout);
     }
   }
 
-  auto now = chrono::system_clock::now();
-  auto dur = chrono::duration_cast<chrono::seconds>(now - start);
-  OKF("Duration: %lu", dur.count());
+  cout << "total_execs " << fuzzer.total_execs << endl;
 }
