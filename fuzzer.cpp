@@ -75,7 +75,11 @@ void Fuzzer::remove_shm(void) {
 }
 
 void Fuzzer::setup_shm(void) {
-  this->shm_id = shmget(IPC_PRIVATE, MAP_SIZE, IPC_CREAT | IPC_EXCL | 0600);
+  /*
+   * [0, MAP_SIZE] => trace_bits
+   * [MAP_SIZE, 2 * MAP_SIZE] => branch distance
+   * */
+  this->shm_id = shmget(IPC_PRIVATE, MAP_SIZE * 2, IPC_CREAT | IPC_EXCL | 0600);
   if (shm_id < 0) PFATAL("shmget() failed");
 
   setenv(SHM_ENV_VAR, std::to_string(shm_id).c_str(), 1);
@@ -174,6 +178,7 @@ u8 Fuzzer::run_target(u32 timeout) {
   int status, res, kill_signal;
 
   memset(this->trace_bits, 0, MAP_SIZE);
+  memset(this->trace_bits + MAP_SIZE, 255, MAP_SIZE);
   MEM_BARRIER();
   this->child_timed_out = 0;
 
