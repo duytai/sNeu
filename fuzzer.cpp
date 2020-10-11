@@ -166,18 +166,16 @@ void Fuzzer::init_forkserver(void) {
   PFATAL("Fork server handshake failed");
 }
 
-void Fuzzer::write_to_testcase(char* mem, u32 len) {
-  lseek(this->out_fd, 0, SEEK_SET);
-  if (write(this->out_fd, mem, len) != len) PFATAL("write() failed");
-  if (ftruncate(this->out_fd, len)) PFATAL("ftruncate() failed");
-  lseek(this->out_fd, 0, SEEK_SET);
-}
-
-u8 Fuzzer::run_target(u32 timeout) {
+u8 Fuzzer::run_target(vector<char>& mem, u32 timeout) {
 
   static struct itimerval it;
   static int prev_timed_out = 0;
   int status, res, kill_signal;
+
+  lseek(this->out_fd, 0, SEEK_SET);
+  write(this->out_fd, mem.data(), mem.size());
+  ftruncate(this->out_fd, mem.size());
+  lseek(this->out_fd, 0, SEEK_SET);
 
   memset(this->trace_bits, 0, MAP_SIZE);
   memset(this->trace_bits + MAP_SIZE, 255, MAP_SIZE);
@@ -266,6 +264,29 @@ void Fuzzer::update_loss(void) {
     current ++;
     virgin ++;
   }
+}
+
+void Fuzzer::update_inst_branches(void) {
+  // u32 i = 0;
+  // vector<u32> inst_branches;
+//
+  // for (i = 0; i < MAP_SIZE; i += 1) {
+    // if (this->virgin_loss[i] != 0 && this->virgin_loss[i] != 255) {
+      // inst_branches.push_back(i);
+    // }
+  // }
+//
+  // for (i = 0; i < this->total_execs; i += 1) {
+    // u8 loss = 255;
+    // FuzzerPair& fuzzer_pair = this->pairs[i];
+    // for (auto br : inst_branches) {
+      // if (likely(loss & fuzzer_pair.loss_bits[br])) {
+        // loss &= fuzzer_pair.loss_bits[br];
+      // }
+    // }
+    // fuzzer_pair.min_loss = loss;
+  // }
+
 }
 
 Fuzzer::~Fuzzer() {

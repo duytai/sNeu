@@ -1,8 +1,10 @@
 #include "fuzzer.h"
+#include "mutator.h"
 #include "debug.h"
 
 #include <vector>
 #include <algorithm>
+#include <fstream>
 #include <string>
 #include <iostream>
 #include <filesystem>
@@ -66,6 +68,7 @@ void setup_signal_handlers() {
 }
 
 int main(int argc, char* argv[]) {
+  auto mut = Mutator(&fuzzer);
   auto opt = parse_arguments(argc, argv);
   u32 exec_tmout = EXEC_TIMEOUT;
   setup_signal_handlers();
@@ -76,14 +79,12 @@ int main(int argc, char* argv[]) {
 
   for (auto &file: files) {
     if (file.is_regular_file() && file.file_size() > 0) {
-      char buffer[file.file_size()];
-      int fd = open(file.path().c_str(), O_RDONLY);
-      if ((size_t) read(fd, buffer, file.file_size()) != file.file_size())
-        PFATAL("read() failed");
-      fuzzer.write_to_testcase(buffer, file.file_size());
-      fuzzer.run_target(exec_tmout);
+      ifstream st(file.path(), ios::binary);
+      vector<char> buffer((istreambuf_iterator<char>(st)), istreambuf_iterator<char>());
+      fuzzer.run_target(buffer, exec_tmout);
+      printf("HNB: %d\n", fuzzer.hnb);
     }
   }
-
   cout << "total_execs " << fuzzer.total_execs << endl;
+  // mut.mutate();
 }

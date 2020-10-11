@@ -7,6 +7,11 @@
 #include "hash.h"
 #include "fuzzer.h"
 
+#include <vector>
+#include <string>
+
+using namespace std;
+
 typedef struct {
   bool use_stdin = true;
   char* in_dir = NULL;
@@ -59,10 +64,10 @@ class Fuzzer {
     void remove_shm(void);
     void setup_shm(void);
     void init_forkserver(void);
-    void write_to_testcase(char* mem, u32 len);
     void update_loss(void);
+    void update_inst_branches(void);
     u8 has_new_bits(void);
-    u8 run_target(u32 exec_tmout);
+    u8 run_target(vector<char>& mem, u32 exec_tmout);
 };
 
 #endif

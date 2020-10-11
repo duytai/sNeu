@@ -15,7 +15,7 @@ instrument: afl-llvm-rt.c
 	$(CC) -c afl-llvm-rt.c $(CFLAGS)
 	$(CC) example/brainfuck.c -o example/brainfuck afl-llvm-rt.o -fsanitize-coverage=trace-pc-guard,trace-cmp,no-prune
 
-main: main.cpp fuzzer.o
+main: main.cpp fuzzer.o mutator.o
 	@mkdir -p bin/
 	$(CXX) -o $(target) $^ -fsanitize=address $(CXXFLAGS)
 
