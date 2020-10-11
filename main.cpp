@@ -82,7 +82,6 @@ int main(int argc, char* argv[]) {
       ifstream st(file.path(), ios::binary);
       vector<char> buffer((istreambuf_iterator<char>(st)), istreambuf_iterator<char>());
       fuzzer.run_target(buffer, exec_tmout);
-      printf("HNB: %d\n", fuzzer.hnb);
     }
   }
   cout << "total_execs " << fuzzer.total_execs << endl;

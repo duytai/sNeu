@@ -38,11 +38,9 @@ void Mutator::mutate() {
   this->fuzzer->update_inst_branches();
   OKF("total_execs: %d", this->fuzzer->total_execs);
 
-  // u32 total_inputs = 0;
-  // for (auto fuzz_pair: this->fuzzer->pairs) {
-    // if (fuzz_pair.min_loss != 255) {
-      // total_inputs += 1;
-    // }
-  // }
-  // OKF("total_inputs: %d", total_inputs);
+  for (auto fuzz_pair: this->fuzzer->pairs) {
+    if (fuzz_pair.min_loss != 255) {
+      OKF("min_loss: %d", fuzz_pair.min_loss);
+    }
+  }
 }

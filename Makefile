@@ -1,12 +1,24 @@
+LIB_TORCH=/root/libtorch/
 CC = clang
 CXX = clang++
-CXXFLAGS += -Wno-pointer-sign -Wno-write-strings -Wc99-designator -std=c++17
-CFLAGS += -Wno-pointer-sign -Wno-write-strings -Wc99-designator
+CXXFLAGS += -Wno-pointer-sign \
+						-Wno-write-strings \
+						-Wc99-designator \
+						-std=c++17 \
+						-I $(LIB_TORCH)/include \
+						-L $(LIB_TORCH)/lib \
+						-ltorch \
+						-lc10 \
+						-lpthread \
+						-lX11
+CFLAGS += -Wno-pointer-sign \
+					-Wno-write-strings \
+					-Wc99-designator
 
 target=bin/fuzzer
 
 all: main instrument
-	./bin/fuzzer -i ./example/out/queue ./example/brainfuck @@
+	LD_LIBRARY_PATH=$(LIB_TORCH)/lib ./bin/fuzzer -i ./example/out/queue ./example/brainfuck @@
 
 %.o: %.cpp
 	$(CXX) -c -o $@ $< $(CXXFLAGS)

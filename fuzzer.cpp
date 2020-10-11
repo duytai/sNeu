@@ -11,6 +11,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <string>
+#include <set>
 
 #include "fuzzer.h"
 
@@ -276,7 +277,15 @@ void Fuzzer::update_inst_branches(void) {
 
   for (i = 0; i < MAP_SIZE; i += 1) {
     if (this->virgin_loss[i] != 0 && this->virgin_loss[i] != 255) {
-      inst_branches.push_back(i);
+      set<u8> losses;
+      for (auto fuzz_pair: pairs) {
+        losses.insert(fuzz_pair.loss_bits[i]);
+      }
+      /*
+       * Value in branch $i changed twice
+       * TODO: increase to reduce number of interesting branches
+       * */
+      if (losses.size() >= 2) inst_branches.push_back(i);
     }
   }
 
