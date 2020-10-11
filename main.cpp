@@ -86,5 +86,5 @@ int main(int argc, char* argv[]) {
     }
   }
   cout << "total_execs " << fuzzer.total_execs << endl;
-  // mut.mutate();
+  mut.mutate();
 }

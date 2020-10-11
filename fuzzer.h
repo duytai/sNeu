@@ -19,6 +19,12 @@ typedef struct {
   char** target_argv = NULL;
 } FuzzerOpt;
 
+typedef struct {
+  vector<char> mem;
+  vector<u8> loss_bits;
+  u8 min_loss;
+} FuzzerPair;
+
 class Fuzzer {
   private:
     s32 forksrv_pid,
@@ -53,6 +59,7 @@ class Fuzzer {
     u64 total_execs;
     u64 exec_ms;
     u8 hnb;
+    vector<FuzzerPair> pairs;
 
     Fuzzer();
     ~Fuzzer();
