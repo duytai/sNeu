@@ -26,6 +26,8 @@ class Fuzzer {
 
     u8 child_timed_out,
       virgin_bits[MAP_SIZE],
+      virgin_loss[MAP_SIZE],
+      * loss_bits,
       * trace_bits,
       count_class_lookup8[256] = {
         [0]           = 0,
@@ -45,6 +47,7 @@ class Fuzzer {
   public:
     u64 total_execs;
     u64 exec_ms;
+    u8 hnb;
 
     Fuzzer();
     ~Fuzzer();
@@ -57,6 +60,7 @@ class Fuzzer {
     void setup_shm(void);
     void init_forkserver(void);
     void write_to_testcase(char* mem, u32 len);
+    void update_loss(void);
     u8 has_new_bits(void);
     u8 run_target(u32 exec_tmout);
 };

@@ -83,11 +83,13 @@ void Fuzzer::setup_shm(void) {
   if (shm_id < 0) PFATAL("shmget() failed");
 
   setenv(SHM_ENV_VAR, std::to_string(shm_id).c_str(), 1);
-  memset(virgin_bits, 255, MAP_SIZE);
+  memset(this->virgin_bits, 255, MAP_SIZE);
+  memset(this->virgin_loss, 255, MAP_SIZE);
 
   void* trace_bits = shmat(shm_id, NULL, 0);
   if (trace_bits == (void *)-1) PFATAL("shmat() failed");
   this->trace_bits = (u8*) trace_bits;
+  this->loss_bits = (u8*) trace_bits + MAP_SIZE;
 }
 
 void Fuzzer::handle_timeout(void) {
@@ -181,6 +183,7 @@ u8 Fuzzer::run_target(u32 timeout) {
   memset(this->trace_bits + MAP_SIZE, 255, MAP_SIZE);
   MEM_BARRIER();
   this->child_timed_out = 0;
+  this->hnb = 0;
 
   if ((res = write(this->fsrv_ctl_fd, &prev_timed_out, 4)) != 4) {
     FATAL("Unable to request new process from fork server (OOM?)");
@@ -210,6 +213,8 @@ u8 Fuzzer::run_target(u32 timeout) {
   this->total_execs ++;
   MEM_BARRIER();
   this->classify_counts();
+  this->hnb = this->has_new_bits();
+  this->update_loss();
 
   if (WIFSIGNALED(status)) {
     kill_signal = WTERMSIG(status);
@@ -221,7 +226,7 @@ u8 Fuzzer::run_target(u32 timeout) {
 }
 
 u8 Fuzzer::has_new_bits(void) {
-  u64* current = (u64*) trace_bits;
+  u64* current = (u64*) this->trace_bits;
   u64* virgin  = (u64*) this->virgin_bits;
   u32 i = (MAP_SIZE >> 3);
   u8 ret = 0;
@@ -247,6 +252,20 @@ u8 Fuzzer::has_new_bits(void) {
   }
 
   return ret;
+}
+
+void Fuzzer::update_loss(void) {
+  u64* current = (u64*) this->loss_bits;
+  u64* virgin  = (u64*) this->virgin_loss;
+  u32 i = (MAP_SIZE >> 3);
+
+  while (i--) {
+    if (unlikely(*current) || likely(*current & *virgin)) {
+      *virgin &= *current;
+    }
+    current ++;
+    virgin ++;
+  }
 }
 
 Fuzzer::~Fuzzer() {

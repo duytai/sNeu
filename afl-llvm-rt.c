@@ -59,8 +59,8 @@
 u8  __afl_area_initial[MAP_SIZE];
 u8* __afl_area_ptr = __afl_area_initial;
 
-u8  __afl_distance_initial[MAP_SIZE];
-u8* __afl_distance_ptr = __afl_area_initial;
+u8  __afl_loss_initial[MAP_SIZE];
+u8* __afl_loss_ptr = __afl_area_initial;
 
 __thread u32 __afl_prev_loc;
 
@@ -94,7 +94,7 @@ static void __afl_map_shm(void) {
        our parent doesn't give up on us. */
 
     __afl_area_ptr[0] = 1;
-    __afl_distance_ptr = __afl_area_ptr + MAP_SIZE;
+    __afl_loss_ptr = __afl_area_ptr + MAP_SIZE;
 
   }
 
@@ -199,7 +199,7 @@ int __afl_persistent_loop(unsigned int max_cnt) {
     if (is_persistent) {
 
       memset(__afl_area_ptr, 0, MAP_SIZE);
-      memset(__afl_distance_ptr, 255, MAP_SIZE);
+      memset(__afl_loss_ptr, 255, MAP_SIZE);
       __afl_area_ptr[0] = 1;
       __afl_prev_loc = 0;
     }
@@ -228,7 +228,7 @@ int __afl_persistent_loop(unsigned int max_cnt) {
          dummy output region. */
 
       __afl_area_ptr = __afl_area_initial;
-      __afl_distance_ptr = __afl_distance_initial;
+      __afl_loss_ptr = __afl_loss_initial;
 
     }
 
@@ -269,8 +269,6 @@ __attribute__((constructor(CONST_PRIO))) void __afl_auto_init(void) {
 
 }
 
-static u32 prev_pc = 0;
-
 /* The following stuff deals with supporting -fsanitize-coverage=trace-pc-guard.
    It remains non-operational in the traditional, plugin-backed LLVM mode.
    For more info about 'trace-pc-guard', see README.llvm.
@@ -279,8 +277,6 @@ static u32 prev_pc = 0;
    edge (as opposed to every basic block). */
 
 void __sanitizer_cov_trace_pc_guard(u32* guard) {
-  u32 pc = (u32*) __builtin_return_address(0);
-  printf("guard: %d - %d\n", guard, pc);
   __afl_area_ptr[*guard]++;
 }
 
@@ -321,30 +317,42 @@ void __sanitizer_cov_trace_pc_guard_init(u32* start, u32* stop) {
 
 }
 
+#define GET_IDX() ({ \
+  u32 pc = (u32) __builtin_return_address(0);\
+  pc % 65521;\
+})
+
 void __sanitizer_cov_trace_cmp1(u8 Arg1, u8 Arg2) {
-  printf("%s\n", __func__);
+  u8 abs_loss = Arg1 == Arg2 ? 0 : 64 - __builtin_clzll(Arg1 ^ Arg2);
+  __afl_loss_ptr[GET_IDX()] &= abs_loss;
 }
 void __sanitizer_cov_trace_cmp2(u16 Arg1, u16 Arg2) {
-  printf("%s\n", __func__);
+  u8 abs_loss = Arg1 == Arg2 ? 0 : 64 - __builtin_clzll(Arg1 ^ Arg2);
+  __afl_loss_ptr[GET_IDX()] &= abs_loss;
 }
 void __sanitizer_cov_trace_cmp4(u32 Arg1, u32 Arg2) {
-  printf("%s\n", __func__);
+  u8 abs_loss = Arg1 == Arg2 ? 0 : 64 - __builtin_clzll(Arg1 ^ Arg2);
+  __afl_loss_ptr[GET_IDX()] &= abs_loss;
 }
 void __sanitizer_cov_trace_cmp8(u64 Arg1, u64 Arg2) {
-  printf("%s\n", __func__);
+  u8 abs_loss = Arg1 == Arg2 ? 0 : 64 - __builtin_clzll(Arg1 ^ Arg2);
+  __afl_loss_ptr[GET_IDX()] &= abs_loss;
 }
 void __sanitizer_cov_trace_const_cmp1(u8 Arg1, u8 Arg2) {
-  printf("%s\n", __func__);
+  u8 abs_loss = Arg1 == Arg2 ? 0 : 64 - __builtin_clzll(Arg1 ^ Arg2);
+  __afl_loss_ptr[GET_IDX()] &= abs_loss;
 }
 void __sanitizer_cov_trace_const_cmp2(u16 Arg1, u16 Arg2) {
-  printf("%s\n", __func__);
+  u8 abs_loss = Arg1 == Arg2 ? 0 : 64 - __builtin_clzll(Arg1 ^ Arg2);
+  __afl_loss_ptr[GET_IDX()] &= abs_loss;
 }
 void __sanitizer_cov_trace_const_cmp4(u32 Arg1, u32 Arg2) {
-  prev_pc = (u32*) __builtin_return_address(0);
-  printf("%s - %lu\n", __func__, prev_pc);
+  u8 abs_loss = Arg1 == Arg2 ? 0 : 64 - __builtin_clzll(Arg1 ^ Arg2);
+  __afl_loss_ptr[GET_IDX()] &= abs_loss;
 }
 void __sanitizer_cov_trace_const_cmp8(u64 Arg1, u64 Arg2) {
-  printf("%s\n", __func__);
+  u8 abs_loss = Arg1 == Arg2 ? 0 : 64 - __builtin_clzll(Arg1 ^ Arg2);
+  __afl_loss_ptr[GET_IDX()] &= abs_loss;
 }
 void __sanitizer_cov_trace_switch(u64 Val, u64 *Cases) {
   printf("%s\n", __func__);
