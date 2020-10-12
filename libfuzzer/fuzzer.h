@@ -64,6 +64,7 @@ class Fuzzer {
     void init_forkserver(void);
     void update_loss(void);
     void update_inst_branches(void);
+    void handle_stop_sig(void);
     u8 has_new_bits(void);
     u8 run_target(vector<char>& mem, u32 exec_tmout);
 };

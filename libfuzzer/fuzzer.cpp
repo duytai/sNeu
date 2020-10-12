@@ -317,6 +317,11 @@ void Fuzzer::update_inst_branches(void) {
 
 }
 
+void Fuzzer::handle_stop_sig(void) {
+  if (this->child_pid > 0) kill(this->child_pid, SIGKILL);
+  if (this->forksrv_pid > 0) kill(this->forksrv_pid, SIGKILL);
+}
+
 Fuzzer::~Fuzzer() {
   this->remove_shm();
 }

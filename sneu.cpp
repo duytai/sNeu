@@ -54,6 +54,10 @@ void handle_timeout(int) {
   fuzzer.handle_timeout();
 }
 
+void handle_stop_sig(int) {
+  fuzzer.handle_stop_sig();
+}
+
 void setup_signal_handlers() {
   struct sigaction sa;
 
@@ -62,6 +66,15 @@ void setup_signal_handlers() {
   sa.sa_sigaction = NULL;
 
   sigemptyset(&sa.sa_mask);
+
+  /* Various ways of saying "stop". */
+
+  sa.sa_handler = handle_stop_sig;
+  sigaction(SIGHUP, &sa, NULL);
+  sigaction(SIGINT, &sa, NULL);
+  sigaction(SIGTERM, &sa, NULL);
+
+   /* Exec timeout notifications. */
 
   sa.sa_handler = handle_timeout;
   sigaction(SIGALRM, &sa, NULL);
