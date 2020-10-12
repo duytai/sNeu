@@ -9,4 +9,4 @@ set(sources
   fuzzer.cpp
 )
 
-add_library(fuzzer STATIC ${sources})
+add_library(fuzzer ${sources})

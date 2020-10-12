@@ -13,7 +13,7 @@
 #include <string>
 #include <set>
 
-#include "fuzzer.h"
+#include <libfuzzer/fuzzer.h>
 
 /* X86 only */
 

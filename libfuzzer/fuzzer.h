@@ -1,11 +1,11 @@
 #ifndef _HAVE_FUZZER_H
 #define _HAVE_FUZZER_H
 
-#include "config.h"
-#include "types.h"
-#include "debug.h"
-#include "hash.h"
-#include "fuzzer.h"
+#include <libfuzzer/config.h>
+#include <libfuzzer/types.h>
+#include <libfuzzer/debug.h>
+#include <libfuzzer/hash.h>
+#include <libfuzzer/fuzzer.h>
 
 #include <vector>
 #include <string>

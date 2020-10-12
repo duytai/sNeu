@@ -1,5 +1,6 @@
-#include "libfuzzer/fuzzer.h"
-#include "libfuzzer/debug.h"
+#include <libfuzzer/fuzzer.h>
+#include <libfuzzer/debug.h>
+#include <libmutator/mutator.h>
 
 #include <vector>
 #include <algorithm>
@@ -67,6 +68,7 @@ void setup_signal_handlers() {
 }
 
 int main(int argc, char* argv[]) {
+  auto mutator = Mutator(&fuzzer);
   auto opt = parse_arguments(argc, argv);
   setup_signal_handlers();
   fuzzer.load_opt(opt);
@@ -82,5 +84,5 @@ int main(int argc, char* argv[]) {
     }
   }
   cout << "total_execs " << fuzzer.total_execs << endl;
-  // mut.mutate();
+  mutator.mutate();
 }
