@@ -40,17 +40,7 @@ class Fuzzer {
       virgin_loss[MAP_SIZE],
       * loss_bits,
       * trace_bits,
-      count_class_lookup8[256] = {
-        [0]           = 0,
-        [1]           = 1,
-        [2]           = 2,
-        [3]           = 4,
-        [4 ... 7]     = 8,
-        [8 ... 15]    = 16,
-        [16 ... 31]   = 32,
-        [32 ... 127]  = 64,
-        [128 ... 255] = 128
-      };
+      count_class_lookup8[256];
 
     u16 count_class_lookup16[65536];
     FuzzerOpt opt;
@@ -65,6 +55,7 @@ class Fuzzer {
     ~Fuzzer();
     void load_opt(FuzzerOpt opt);
     void init_count_class16(void);
+    void init_count_class8(void);
     void classify_counts(void);
     void handle_timeout(void);
     void setup_fds(void);

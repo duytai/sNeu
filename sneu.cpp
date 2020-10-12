@@ -1,6 +1,5 @@
-#include "fuzzer.h"
-#include "mutator.h"
-#include "debug.h"
+#include "libfuzzer/fuzzer.h"
+#include "libfuzzer/debug.h"
 
 #include <vector>
 #include <algorithm>
@@ -42,7 +41,7 @@ FuzzerOpt parse_arguments(int argc, char* argv[]) {
   fuzzer_opt.target_argv = argv + i;
 
   if (fuzzer_opt.in_dir == NULL || fuzzer_opt.target_argv[0] == NULL) {
-    SAYF("  Usage: %s <in_dir> <app>\n", argv[0]);
+    SAYF("  Usage: %s -i <in_dir> <app>\n", argv[0]);
     exit(EXIT_SUCCESS);
   }
 
@@ -68,9 +67,7 @@ void setup_signal_handlers() {
 }
 
 int main(int argc, char* argv[]) {
-  auto mut = Mutator(&fuzzer);
   auto opt = parse_arguments(argc, argv);
-  u32 exec_tmout = EXEC_TIMEOUT;
   setup_signal_handlers();
   fuzzer.load_opt(opt);
 
@@ -81,9 +78,9 @@ int main(int argc, char* argv[]) {
     if (file.is_regular_file() && file.file_size() > 0) {
       ifstream st(file.path(), ios::binary);
       vector<char> buffer((istreambuf_iterator<char>(st)), istreambuf_iterator<char>());
-      fuzzer.run_target(buffer, exec_tmout);
+      fuzzer.run_target(buffer, EXEC_TIMEOUT);
     }
   }
   cout << "total_execs " << fuzzer.total_execs << endl;
-  mut.mutate();
+  // mut.mutate();
 }

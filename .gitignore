@@ -1,4 +1,2 @@
-*.o
-bin/
-example/
-.cur_input
+.clang
+build/
