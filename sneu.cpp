@@ -9,7 +9,6 @@
 using namespace std;
 
 Fuzzer fuzzer;
-TestSuite suite(&fuzzer);
 
 SNeuOptions parse_arguments(int argc, char* argv[]) {
   SNeuOptions sneu_opt;
@@ -71,5 +70,7 @@ void setup_signal_handlers() {
 int main(int argc, char* argv[]) {
   auto opt = parse_arguments(argc, argv);
   setup_signal_handlers();
-  fuzzer.load_opt(opt);
+  TestSuite suite(&fuzzer, opt);
+  // fuzzer.load_opt(opt);
+  // suite.load_from_dir(opt.in_dir);
 }

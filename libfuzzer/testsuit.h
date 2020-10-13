@@ -8,17 +8,20 @@
 using namespace std;
 
 typedef struct {
-  vector<char> mem;
+  vector<char> buffer;
   vector<u8> loss_bits;
-  u8 min_loss;
+  u8 min_loss = 255;
+  u8 hnb;
 } TestCase;
 
 class TestSuite {
   vector<TestCase> testcases;
   Fuzzer *fuzzer = NULL;
+  SNeuOptions opt;
   public:
-    TestSuite(Fuzzer* fuzzer);
-    void load_from_dir(char* in_dir);
+    TestSuite(Fuzzer* fuzzer, SNeuOptions opt);
+    void load_from_in_dir();
+    void load_from_dir(char* dir);
 };
 
 #endif
