@@ -1,5 +1,3 @@
-project(libmutator)
-
 set(sources
   mutator.h
   mutator.cpp

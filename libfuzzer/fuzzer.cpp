@@ -33,7 +33,7 @@ Fuzzer::Fuzzer(void) {
   this->setup_shm();
 }
 
-void Fuzzer::load_opt(FuzzerOpt opt) {
+void Fuzzer::load_opt(SNeuOptions opt) {
   this->opt = opt;
   this->init_forkserver();
 }
@@ -231,10 +231,6 @@ u8 Fuzzer::run_target(vector<char>& mem, u32 timeout) {
   this->hnb = this->has_new_bits();
   this->update_loss();
 
-  vector<u8> tmp(this->loss_bits, this->loss_bits + MAP_SIZE);
-  FuzzerPair p = {.mem = mem, .loss_bits = tmp, .min_loss = 255 };
-  this->pairs.push_back(p);
-
   if (WIFSIGNALED(status)) {
     kill_signal = WTERMSIG(status);
     if (this->child_timed_out && kill_signal == SIGKILL) return FAULT_TMOUT;
@@ -285,36 +281,6 @@ void Fuzzer::update_loss(void) {
     current ++;
     virgin ++;
   }
-}
-
-void Fuzzer::update_inst_branches(void) {
-  u32 i = 0;
-  vector<u32> inst_branches;
-
-  for (i = 0; i < MAP_SIZE; i += 1) {
-    if (this->virgin_loss[i] != 0 && this->virgin_loss[i] != 255) {
-      set<u8> losses;
-      for (auto fuzz_pair: pairs) {
-        losses.insert(fuzz_pair.loss_bits[i]);
-      }
-      /*
-       * Value in branch $i changed twice
-       * TODO: increase to reduce number of interesting branches
-       * */
-      if (losses.size() >= 2) inst_branches.push_back(i);
-    }
-  }
-
-  for (auto& fuzz_pair: pairs) {
-    u8 loss = 255;
-    for (auto br : inst_branches) {
-      if (likely(loss & fuzz_pair.loss_bits[br])) {
-        loss &= fuzz_pair.loss_bits[br];
-      }
-    }
-    fuzz_pair.min_loss = loss;
-  }
-
 }
 
 void Fuzzer::handle_stop_sig(void) {

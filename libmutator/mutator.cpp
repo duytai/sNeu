@@ -19,28 +19,23 @@ void Mutator::byte_flip(vector<char>& mem) {
   }
 }
 
-// TODO: add checksum to avoid re-flip
+// TODO: add checksum to avoid refliping
 void Mutator::mutate() {
-  auto total_execs = this->fuzzer->total_execs;
+  // auto total_execs = this->fuzzer->total_execs;
+//
+  // this->fuzzer->update_inst_branches();
+  // OKF("total_execs: %d", total_execs);
 
-  this->fuzzer->update_inst_branches();
-  for (u32 i = 0; i < total_execs; i += 1) {
-    auto fuzz_pair = this->fuzzer->pairs[i];
-    if (fuzz_pair.min_loss != 255) {
+  // for (u32 i = 0; i < total_execs; i += 1) {
+    // auto fuzz_pair = this->fuzzer->pairs[i];
+    // if (fuzz_pair.min_loss != 255) {
       /*
        * This testcase touch one interesting branch at the least
        * we mutate to generate more testcases for training 
        * */
-      ACTF("byte_flip %d", (u32)fuzz_pair.mem.size());
-      this->byte_flip(fuzz_pair.mem);
-    }
-  }
-  this->fuzzer->update_inst_branches();
-  OKF("total_execs: %d", this->fuzzer->total_execs);
+      // ACTF("byte_flip %d", (u32)fuzz_pair.mem.size());
+      // this->byte_flip(fuzz_pair.mem);
+    // }
+  // }
 
-  for (auto fuzz_pair: this->fuzzer->pairs) {
-    if (fuzz_pair.min_loss != 255) {
-      OKF("min_loss: %d", fuzz_pair.min_loss);
-    }
-  }
 }

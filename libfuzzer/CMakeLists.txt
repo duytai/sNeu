@@ -1,5 +1,3 @@
-project(libfuzzer)
-
 set(sources
   types.h
   debug.h
@@ -7,6 +5,8 @@ set(sources
   hash.h
   fuzzer.h
   fuzzer.cpp
+  testsuit.h
+  testsuit.cpp
 )
 
 add_library(fuzzer ${sources})
