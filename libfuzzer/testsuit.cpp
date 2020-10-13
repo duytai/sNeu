@@ -26,6 +26,13 @@ void TestSuite::load_from_dir(char* dir) {
     }
   }
 }
+
+void TestSuite::exec(void) {
+  for (auto& testcase : this->testcases) {
+    this->fuzzer->run_target(testcase.buffer, EXEC_TIMEOUT);
+  }
+}
+
 void TestSuite::load_from_in_dir() {
   this->load_from_dir(this->opt.in_dir);
 }

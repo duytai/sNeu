@@ -71,6 +71,5 @@ int main(int argc, char* argv[]) {
   auto opt = parse_arguments(argc, argv);
   setup_signal_handlers();
   TestSuite suite(&fuzzer, opt);
-  // fuzzer.load_opt(opt);
-  // suite.load_from_dir(opt.in_dir);
+  suite.load_from_in_dir();
 }
