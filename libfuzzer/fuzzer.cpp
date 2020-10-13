@@ -27,7 +27,6 @@ enum {
 };
 
 Fuzzer::Fuzzer(void) {
-  this->init_count_class8();
   this->init_count_class16();
   this->setup_fds();
   this->setup_shm();
@@ -52,21 +51,6 @@ void Fuzzer::classify_counts() {
     }
     mem++;
   }
-}
-
-void Fuzzer::init_count_class8(void) {
-  u32 i = 0;
-
-  this->count_class_lookup8[++i] = 1;
-  this->count_class_lookup8[++i] = 2;
-  this->count_class_lookup8[++i] = 4;
-
-  for (;i < 8; i += 1) this->count_class_lookup8[i] = 8;
-  for (;i < 16; i += 1) this->count_class_lookup8[i] = 16;
-  for (;i < 32; i += 1) this->count_class_lookup8[i] = 32;
-  for (;i < 128; i += 1) this->count_class_lookup8[i] = 64;
-  for (;i < 256; i += 1) this->count_class_lookup8[i] = 128;
-
 }
 
 void Fuzzer::init_count_class16(void) {

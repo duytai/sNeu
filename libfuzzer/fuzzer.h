@@ -24,7 +24,17 @@ class Fuzzer {
       dev_null_fd = -1;
 
     u8 child_timed_out,
-      count_class_lookup8[256];
+       count_class_lookup8[256] = {
+         [0]           = 0,
+         [1]           = 1,
+         [2]           = 2,
+         [3]           = 4,
+         [4 ... 7]     = 8,
+         [8 ... 15]    = 16,
+         [16 ... 31]   = 32,
+         [32 ... 127]  = 64,
+         [128 ... 255] = 128
+       };
 
     u16 count_class_lookup16[65536];
     SNeuOptions opt;
@@ -42,7 +52,6 @@ class Fuzzer {
     ~Fuzzer();
     void load_opt(SNeuOptions opt);
     void init_count_class16(void);
-    void init_count_class8(void);
     void classify_counts(void);
     void handle_timeout(void);
     void setup_fds(void);

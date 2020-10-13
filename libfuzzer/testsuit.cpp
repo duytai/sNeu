@@ -19,6 +19,7 @@ void TestSuite::load_from_dir(char* dir) {
 
   for (auto &file: files) {
     if (file.is_regular_file() && file.file_size() > 0) {
+      OKF("P: %s", file.path().c_str());
       ifstream st(file.path(), ios::binary);
       vector<char> buffer((istreambuf_iterator<char>(st)), istreambuf_iterator<char>());
       TestCase t = {.buffer = buffer};
@@ -30,6 +31,10 @@ void TestSuite::load_from_dir(char* dir) {
 void TestSuite::exec(void) {
   for (auto& testcase : this->testcases) {
     this->fuzzer->run_target(testcase.buffer, EXEC_TIMEOUT);
+    vector<u8> loss_bits(this->fuzzer->loss_bits, this->fuzzer->loss_bits + MAP_SIZE);
+    testcase.loss_bits = loss_bits;
+    testcase.hnb = this->fuzzer->hnb;
+    OKF("HNB: %d", testcase.hnb);
   }
 }
 
