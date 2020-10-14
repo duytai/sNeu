@@ -91,6 +91,7 @@ void Fuzzer::setup_shm(void) {
   if (trace_bits == (void *)-1) PFATAL("shmat() failed");
   this->trace_bits = (u8*) trace_bits;
   this->loss_bits = (u8*) trace_bits + MAP_SIZE;
+  this->loss_bits[0] = 255;
 }
 
 void Fuzzer::handle_timeout(void) {
@@ -179,7 +180,7 @@ u8 Fuzzer::run_target(vector<char>& mem, u32 timeout) {
   lseek(this->out_fd, 0, SEEK_SET);
 
   memset(this->trace_bits, 0, MAP_SIZE);
-  memset(this->trace_bits + MAP_SIZE, 255, MAP_SIZE);
+  memset(this->loss_bits, 255, MAP_SIZE);
   MEM_BARRIER();
   this->child_timed_out = 0;
   this->hnb = 0;

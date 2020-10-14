@@ -1,5 +1,5 @@
 #include <torch/torch.h>
-#include <libnet/net.h>
+#include <libfuzzer/net.h>
 
 Net::Net(u64 n) {
   this->in = register_module("in", torch::nn::Linear(n, 64));

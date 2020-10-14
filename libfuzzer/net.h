@@ -1,7 +1,7 @@
 #include <torch/torch.h>
 #include <libfuzzer/types.h>
 
-class Net: torch::nn::Module {
+class Net: public torch::nn::Module {
   public:
     Net(u64 n);
     torch::Tensor forward(torch::Tensor X);

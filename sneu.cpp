@@ -72,5 +72,6 @@ int main(int argc, char* argv[]) {
   setup_signal_handlers();
   TestSuite suite(&fuzzer, opt);
   suite.load_from_in_dir();
-  suite.exec();
+  suite.exec_remaining();
+  suite.smart_mutate();
 }
