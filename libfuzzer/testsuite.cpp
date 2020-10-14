@@ -16,7 +16,8 @@ TestSuite::TestSuite(Fuzzer* fuzzer, SNeuOptions opt) {
   this->opt = opt;
 }
 
-void TestSuite::load_from_dir(char* dir) {
+vector<TestCase> TestSuite::load_from_dir(char* dir) {
+  vector<TestCase> tcs;
   vector<directory_entry> files((directory_iterator(dir)), directory_iterator());
   sort(files.begin(), files.end());
 
@@ -25,23 +26,21 @@ void TestSuite::load_from_dir(char* dir) {
       ifstream st(file.path(), ios::binary);
       vector<char> buffer((istreambuf_iterator<char>(st)), istreambuf_iterator<char>());
       this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-      this->testcases.push_back(this->fuzzer->tc);
+      tcs.push_back(this->fuzzer->tc);
     }
   }
+
+  return tcs;
 }
 
-void TestSuite::load_from_in_dir(void) {
-  this->load_from_dir(this->opt.in_dir);
-}
-
-void TestSuite::compute_branch_loss(void) {
+void TestSuite::compute_branch_loss(vector<TestCase>& testcases) {
   vector<u32> inst_branches;
   u32 i = 0;
 
   for (; i < MAP_SIZE; i += 1) {
     if (this->fuzzer->virgin_loss[i] != 0 && this->fuzzer->virgin_loss[i] != 255) {
       set<u8> losses;
-      for (auto t: this->testcases) {
+      for (auto t: testcases) {
         losses.insert(t.loss_bits[i]);
       }
       /*
@@ -71,7 +70,7 @@ void TestSuite::compute_branch_loss(void) {
  * modified losses of uncover branches
  * */
 
-vector<TestCase> TestSuite::smart_mutate(void) {
+vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
   vector<torch::Tensor> xs, ys;
   vector<TestCase> tcs;
   u32 max_len = 0,
@@ -81,15 +80,15 @@ vector<TestCase> TestSuite::smart_mutate(void) {
       num_execs  = 0;
 
   ACTF("Smart Mutation");
-  this->compute_branch_loss();
-  for (auto t : this->testcases) {
+  this->compute_branch_loss(testcases);
+  for (auto t : testcases) {
     if (t.min_loss != 255) {
       max_len = max((u32) t.buffer.size(), max_len);
     }
   }
   OKF("\tMaxLen\t: %d", max_len);
 
-  for (auto t : this->testcases) {
+  for (auto t : testcases) {
     if (t.min_loss != 255) {
       torch::Tensor x = torch::zeros(max_len);
       torch::Tensor y = torch::zeros(1);
@@ -101,7 +100,7 @@ vector<TestCase> TestSuite::smart_mutate(void) {
       ys.push_back(y);
     }
   }
-  OKF("\tHas\t: %lu ts", this->testcases.size());
+  OKF("\tHas\t: %lu ts", testcases.size());
   OKF("\tTrain\t: %lu ts", xs.size());
 
   auto net = std::make_shared<Net>(max_len);
@@ -154,5 +153,6 @@ vector<TestCase> TestSuite::smart_mutate(void) {
 }
 
 void TestSuite::mutate(void) {
-  auto tcs = this->smart_mutate();
+  auto tcs = this->load_from_dir(this->opt.in_dir);
+  this->smart_mutate(tcs);
 }

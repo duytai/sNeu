@@ -8,16 +8,15 @@
 using namespace std;
 
 class TestSuite {
-  vector<TestCase> testcases;
   Fuzzer *fuzzer = NULL;
   SNeuOptions opt;
+
   public:
     TestSuite(Fuzzer* fuzzer, SNeuOptions opt);
-    void load_from_in_dir(void);
-    void load_from_dir(char* dir);
-    void compute_branch_loss(void);
     void mutate(void);
-    vector<TestCase> smart_mutate(void);
+    void compute_branch_loss(vector<TestCase>&);
+    vector<TestCase> load_from_dir(char* dir);
+    vector<TestCase> smart_mutate(vector<TestCase>&);
 };
 
 #endif
