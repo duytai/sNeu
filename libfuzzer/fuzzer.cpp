@@ -212,9 +212,13 @@ u8 Fuzzer::run_target(vector<char>& mem, u32 timeout) {
   prev_timed_out = this->child_timed_out;
   this->total_execs ++;
   MEM_BARRIER();
+
   this->classify_counts();
   this->hnb = this->has_new_bits();
   this->update_loss();
+
+  vector<u8> loss_bits(this->loss_bits, this->loss_bits + MAP_SIZE);
+  this->tc = { .buffer = mem, .loss_bits = loss_bits, .hnb = this->hnb };
 
   if (WIFSIGNALED(status)) {
     kill_signal = WTERMSIG(status);

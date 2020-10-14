@@ -25,12 +25,7 @@ void TestSuite::load_from_dir(char* dir) {
       ifstream st(file.path(), ios::binary);
       vector<char> buffer((istreambuf_iterator<char>(st)), istreambuf_iterator<char>());
       this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-      vector<u8> loss_bits(this->fuzzer->loss_bits, this->fuzzer->loss_bits + MAP_SIZE);
-      TestCase t;
-      t.buffer = buffer;
-      t.loss_bits = loss_bits;
-      t.hnb = this->fuzzer->hnb;
-      this->testcases.push_back(t);
+      this->testcases.push_back(this->fuzzer->tc);
     }
   }
 }
@@ -76,15 +71,16 @@ void TestSuite::compute_branch_loss(void) {
  * modified losses of uncover branches
  * */
 
-void TestSuite::smart_mutate(void) {
-  ACTF("Smart Mutation");
+vector<TestCase> TestSuite::smart_mutate(void) {
   vector<torch::Tensor> xs, ys;
+  vector<TestCase> tcs;
   u32 max_len = 0,
       train_epoch = 1000,
       mutate_epoch = 50,
       num_found = 0,
       num_execs  = 0;
 
+  ACTF("Smart Mutation");
   this->compute_branch_loss();
   for (auto t : this->testcases) {
     if (t.min_loss != 255) {
@@ -142,12 +138,8 @@ void TestSuite::smart_mutate(void) {
       vector buffer((char*) temp.data_ptr(), (char*) temp.data_ptr() + temp.numel());
       this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
       if (this->fuzzer->hnb) {
-        vector<u8> loss_bits(this->fuzzer->loss_bits, this->fuzzer->loss_bits + MAP_SIZE);
-        TestCase t;
-        t.buffer = buffer;
-        t.loss_bits = loss_bits;
-        t.hnb = this->fuzzer->hnb;
         num_found += 1;
+        tcs.push_back(this->fuzzer->tc);
       }
       num_execs += 1;
 
@@ -158,8 +150,9 @@ void TestSuite::smart_mutate(void) {
   }
 
   OKF("\tExecs\t: %d/%d", num_found, num_execs);
+  return tcs;
 }
 
 void TestSuite::mutate(void) {
-  this->smart_mutate();
+  auto tcs = this->smart_mutate();
 }

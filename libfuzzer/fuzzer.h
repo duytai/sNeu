@@ -13,6 +13,13 @@
 
 using namespace std;
 
+typedef struct {
+  vector<char> buffer;
+  vector<u8> loss_bits;
+  u8 min_loss = 255;
+  u8 hnb;
+} TestCase;
+
 class Fuzzer {
   private:
     s32 forksrv_pid,
@@ -42,6 +49,7 @@ class Fuzzer {
   public:
     u64 total_execs;
     u64 exec_ms;
+    TestCase tc;
     u8 hnb,
        virgin_bits[MAP_SIZE],
        virgin_loss[MAP_SIZE],

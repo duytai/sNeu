@@ -7,13 +7,6 @@
 
 using namespace std;
 
-typedef struct {
-  vector<char> buffer;
-  vector<u8> loss_bits;
-  u8 min_loss = 255;
-  u8 hnb;
-} TestCase;
-
 class TestSuite {
   vector<TestCase> testcases;
   Fuzzer *fuzzer = NULL;
@@ -24,7 +17,7 @@ class TestSuite {
     void load_from_dir(char* dir);
     void compute_branch_loss(void);
     void mutate(void);
-    void smart_mutate(void);
+    vector<TestCase> smart_mutate(void);
 };
 
 #endif
