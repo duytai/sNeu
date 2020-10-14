@@ -1,5 +1,5 @@
 #include <libfuzzer/fuzzer.h>
-#include <libfuzzer/testsuit.h>
+#include <libfuzzer/testsuite.h>
 #include <libfuzzer/debug.h>
 #include <libutil/util.h>
 

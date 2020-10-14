@@ -1,5 +1,5 @@
 #include <torch/torch.h>
-#include <libfuzzer/testsuit.h>
+#include <libfuzzer/testsuite.h>
 #include <libfuzzer/fuzzer.h>
 #include <libfuzzer/net.h>
 #include <filesystem>

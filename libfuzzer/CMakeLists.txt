@@ -5,8 +5,8 @@ set(sources
   hash.h
   fuzzer.h
   fuzzer.cpp
-  testsuit.h
-  testsuit.cpp
+  testsuite.h
+  testsuite.cpp
   net.h
   net.cpp
 )
