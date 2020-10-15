@@ -212,11 +212,12 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, Stage stage) {
               tcs.push_back(this->fuzzer->tc);
             }
           }
+          buffer[i] = orig;
         }
-        buffer[i] = orig;
       }
       break;
     case Stage::STAGE_ARITH16:
+      if (buffer.size() < 2) break;
       for (u32 i = 0; i < buffer.size() - 1; i += 1) {
         u16 orig = *(u16*)(buffer.data() + i);
         for (u32 j = 0; j < ARITH_MAX; j += 1) {
@@ -253,15 +254,16 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, Stage stage) {
               tcs.push_back(this->fuzzer->tc);
             }
           }
+          *(u16*)(buffer.data() + i) = orig;
         }
-        *(u16*)(buffer.data() + i) = orig;
       }
       break;
     case Stage::STAGE_ARITH32:
+      if (buffer.size() < 4) break;
       for (u32 i = 0; i < buffer.size() - 3; i += 1) {
         u32 orig = *(u32*)(buffer.data() + i);
         for (u32 j = 0; j < ARITH_MAX; j += 1) {
-          u16 r1 = orig ^ (orig + j),
+          u32 r1 = orig ^ (orig + j),
               r2 = orig ^ (orig - j),
               r3 = orig ^ SWAP32(SWAP32(orig) + j),
               r4 = orig ^ SWAP32(SWAP32(orig) - j);
@@ -294,21 +296,87 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, Stage stage) {
               tcs.push_back(this->fuzzer->tc);
             }
           }
+          *(u32*)(buffer.data() + i) = orig;
         }
-        *(u32*)(buffer.data() + i) = orig;
       }
       break;
     case Stage::STAGE_INTEREST8:
       for (u32 i = 0; i < buffer.size(); i += 1) {
         u8 orig = buffer[i];
         for (u32 j = 0; j < sizeof(interesting_8); j += 1) {
-          if (!(orig ^ interesting_8[j])) continue;
+          if (could_be_bitflip(orig ^ (u8)interesting_8[j]) ||
+              could_be_arith(orig, (u8)interesting_8[j], 1)) {
+            continue;
+          }
+          buffer[i] = interesting_8[j];
+          this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+          if (this->fuzzer->tc.hnb) {
+            tcs.push_back(this->fuzzer->tc);
+          }
+          buffer[i] = orig;
         }
       }
       break;
     case Stage::STAGE_INTEREST16:
+      if (buffer.size() < 2) break;
+      for (u32 i = 0; i < buffer.size() - 1; i += 1) {
+        u16 orig = *(u16*)(buffer.data() + i);
+
+        for (u32 j = 0; j < sizeof(interesting_16) / 2; j += 1) {
+          if (!could_be_bitflip(orig ^ (u16)interesting_16[j]) &&
+              !could_be_arith(orig, (u16)interesting_16[j], 2) &&
+              !could_be_interest(orig, (u16)interesting_16[j], 2, 0)) {
+            *(u16*)(buffer.data() + i) = interesting_16[j];
+            this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+            if (this->fuzzer->tc.hnb) {
+              tcs.push_back(this->fuzzer->tc);
+            }
+          }
+          if ((u16)interesting_16[j] != SWAP16(interesting_16[j]) &&
+              !could_be_bitflip(orig ^ SWAP16(interesting_16[j])) &&
+              !could_be_arith(orig, SWAP16(interesting_16[j]), 2) &&
+              !could_be_interest(orig, SWAP16(interesting_16[j]), 2, 1)) {
+            *(u16*)(buffer.data() + i) = SWAP16(interesting_16[j]);
+            this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+            if (this->fuzzer->tc.hnb) {
+              tcs.push_back(this->fuzzer->tc);
+            }
+          }
+        }
+
+        *(u16*)(buffer.data() + i) = orig;
+      }
       break;
     case Stage::STAGE_INTEREST32:
+      if (buffer.size() < 4) break;
+      for (u32 i = 0; i < buffer.size() - 3; i += 1) {
+        u32 orig = *(u32*)(buffer.data() + i);
+
+        for (u32 j = 0; j < sizeof(interesting_32) / 4; j += 1) {
+          if (!could_be_bitflip(orig ^ (u32)interesting_32[j]) &&
+              !could_be_arith(orig, interesting_32[j], 4) &&
+              !could_be_interest(orig, interesting_32[j], 4, 0)) {
+            *(u32*)(buffer.data()+ i) = interesting_32[j];
+            this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+            if (this->fuzzer->tc.hnb) {
+              tcs.push_back(this->fuzzer->tc);
+            }
+          } 
+
+          if ((u32)interesting_32[j] != SWAP32(interesting_32[j]) &&
+              !could_be_bitflip(orig ^ SWAP32(interesting_32[j])) &&
+              !could_be_arith(orig, SWAP32(interesting_32[j]), 4) &&
+              !could_be_interest(orig, SWAP32(interesting_32[j]), 4, 1)) {
+            *(u32*)(buffer.data() + i) = SWAP32(interesting_32[j]);
+            this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+            if (this->fuzzer->tc.hnb) {
+              tcs.push_back(this->fuzzer->tc);
+            }
+          }
+        }
+
+        *(u32*)(buffer.data() + i) = orig;
+      }
       break;
   }
 
