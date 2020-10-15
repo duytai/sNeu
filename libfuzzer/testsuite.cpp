@@ -196,6 +196,8 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
   }
 
   u8 eff_map[EFF_ALEN(buffer.size())];
+  memset(eff_map, 0, EFF_ALEN(buffer.size()));
+
   u32 eff_cnt = 1;
   eff_map[0] = 1;
 
@@ -211,6 +213,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
     if (this->fuzzer->tc.hnb) {
       tcs.push_back(this->fuzzer->tc);
     }
+
     if (!eff_map[EFF_APOS(i)]) {
       u32 new_cksum = hash32(this->fuzzer->trace_bits, MAP_SIZE, HASH_CONST);
       if (new_cksum != cksum) {
@@ -218,6 +221,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
         eff_cnt += 1;
       }
     }
+
     buffer.data()[i] ^= 0xFF;
   }
 
