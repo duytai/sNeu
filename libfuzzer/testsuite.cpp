@@ -153,10 +153,8 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
   return tcs;
 }
 
-vector<TestCase> TestSuite::flip(vector<char> buffer, Stage stage) {
-
+vector<TestCase> TestSuite::deterministic(vector<char> buffer, Stage stage) {
   vector<TestCase> tcs;
-
   switch (stage) {
     case Stage::STAGE_FLIP8:
       for (u32 i = 0; i < buffer.size(); i += 1) {
@@ -192,16 +190,6 @@ vector<TestCase> TestSuite::flip(vector<char> buffer, Stage stage) {
         *(u32*)(buffer.data() + i) ^= 0xFFFFFFFF;
       }
       break;
-  }
-
-  return tcs;
-}
-
-vector<TestCase> TestSuite::arith(vector<char> buffer, Stage stage) {
-
-  vector<TestCase> tcs;
-
-  switch (stage) {
     case Stage::STAGE_ARITH8:
       for (u32 i = 0; i < buffer.size(); i += 1) {
         u8 orig = buffer[i];
@@ -309,43 +297,42 @@ vector<TestCase> TestSuite::arith(vector<char> buffer, Stage stage) {
       }
       break;
   }
-
   return tcs;
 }
 
 void TestSuite::mutate(void) {
 
   vector<TestCase> tcs;
-  char* tmp = "+------+[------------------------,,,,,,]";
+  char* tmp = "+------+[----------],,,,,,,,,,,";
   vector<char> buffer(tmp, tmp + strlen(tmp));
 
   u32 total_execs = this->fuzzer->total_execs;
-  tcs = this->flip(buffer, Stage::STAGE_FLIP8);
+  tcs = this->deterministic(buffer, Stage::STAGE_FLIP8);
   OKF("FLIP8 %lu", tcs.size());
   OKF("total_execs: %d", this->fuzzer->total_execs - total_execs);
 
   total_execs = this->fuzzer->total_execs;
-  tcs = this->flip(buffer, Stage::STAGE_FLIP16);
+  tcs = this->deterministic(buffer, Stage::STAGE_FLIP16);
   OKF("FLIP16 %lu", tcs.size());
   OKF("total_execs: %d", this->fuzzer->total_execs - total_execs);
 
   total_execs = this->fuzzer->total_execs;
-  tcs = this->flip(buffer, Stage::STAGE_FLIP32);
+  tcs = this->deterministic(buffer, Stage::STAGE_FLIP32);
   OKF("FLIP32 %lu", tcs.size());
   OKF("total_execs: %d", this->fuzzer->total_execs - total_execs);
 
   total_execs = this->fuzzer->total_execs;
-  tcs = this->arith(buffer, Stage::STAGE_ARITH8);
+  tcs = this->deterministic(buffer, Stage::STAGE_ARITH8);
   OKF("ARITH8 %lu", tcs.size());
   OKF("total_execs: %d", this->fuzzer->total_execs - total_execs);
 
   total_execs = this->fuzzer->total_execs;
-  tcs = this->arith(buffer, Stage::STAGE_ARITH16);
+  tcs = this->deterministic(buffer, Stage::STAGE_ARITH16);
   OKF("ARITH16 %lu", tcs.size());
   OKF("total_execs: %d", this->fuzzer->total_execs - total_execs);
 
   total_execs = this->fuzzer->total_execs;
-  tcs = this->arith(buffer, Stage::STAGE_ARITH32);
+  tcs = this->deterministic(buffer, Stage::STAGE_ARITH32);
   OKF("ARITH32 %lu", tcs.size());
   OKF("total_execs: %d", this->fuzzer->total_execs - total_execs);
 }

@@ -14,6 +14,9 @@ typedef enum {
   STAGE_ARITH8,
   STAGE_ARITH16,
   STAGE_ARITH32,
+  STAGE_INTEREST8,
+  STAGE_INTEREST16,
+  STAGE_INTEREST32,
 } Stage;
 
 class TestSuite {
@@ -26,8 +29,7 @@ class TestSuite {
     void compute_branch_loss(vector<TestCase>&);
     vector<TestCase> load_from_dir(char* dir);
     vector<TestCase> smart_mutate(vector<TestCase>&);
-    vector<TestCase> flip(vector<char>, Stage);
-    vector<TestCase> arith(vector<char>, Stage);
+    vector<TestCase> deterministic(vector<char>, Stage);
 };
 
 #endif
