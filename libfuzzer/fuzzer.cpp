@@ -14,6 +14,7 @@
 #include <set>
 
 #include <libfuzzer/fuzzer.h>
+#include <libfuzzer/util.h>
 
 /* X86 only */
 
@@ -30,6 +31,7 @@ Fuzzer::Fuzzer(void) {
   this->init_count_class16();
   this->setup_fds();
   this->setup_shm();
+  this->start_time = get_cur_time();
 }
 
 void Fuzzer::load_opt(SNeuOptions opt) {
@@ -217,6 +219,7 @@ u8 Fuzzer::run_target(vector<char>& mem, u32 timeout) {
 
   vector<u8> loss_bits(this->loss_bits, this->loss_bits + MAP_SIZE);
   this->tc = { .buffer = mem, .loss_bits = loss_bits, .hnb = this->has_new_bits() };
+  this->total_ints += this->tc.hnb > 0 ? 1 : 0;
   this->show_info(0);
 
   if (WIFSIGNALED(status)) {
@@ -279,13 +282,12 @@ void Fuzzer::handle_stop_sig(void) {
 #define UP "\x1b[A"
 #define DOWN "\n"
 void Fuzzer::show_info(u8 force) {
-  if (this->total_execs == 1) {
-    SAYF(DOWN DOWN);
-  } 
+  if (this->total_execs == 1) SAYF(DOWN DOWN);
   if ((this->total_execs % 1000) == 0 || force) {
+    u64 duration = get_cur_time() - this->start_time;
     SAYF(UP UP);
-    SAYF("Total execs: %llu\n", this->total_execs);
-    SAYF("Total uuuu: %llu\n", this->total_execs);
+    SAYF("  Execs\t: %llu/%llu\n", this->total_ints, this->total_execs);
+    SAYF("  Speed\t: %.0f\n", this->total_execs / (duration / 1000.0));
   }
 }
 

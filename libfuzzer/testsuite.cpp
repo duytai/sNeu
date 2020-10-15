@@ -449,7 +449,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
 
 void TestSuite::mutate(void) {
 
-  char* tmp = "+------+[----------],,,,,,,,,,,";
+  char* tmp = "+++++++++++++[-----------]]]]----------------]";
   vector<char> buffer(tmp, tmp + strlen(tmp));
 
   this->fuzzer->run_target(buffer, EXEC_TIMEOUT);

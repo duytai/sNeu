@@ -3,6 +3,7 @@
 
 #include <libfuzzer/types.h>
 #include <libfuzzer/config.h>
+#include <sys/time.h>
 
 static s8  interesting_8[]  = { INTERESTING_8 };
 static s16 interesting_16[] = { INTERESTING_8, INTERESTING_16 };
@@ -183,6 +184,17 @@ static u8 could_be_interest(u32 old_val, u32 new_val, u8 blen, u8 check_le) {
   }
 
   return 0;
+
+}
+
+static u64 get_cur_time(void) {
+
+  struct timeval tv;
+  struct timezone tz;
+
+  gettimeofday(&tv, &tz);
+
+  return (tv.tv_sec * 1000ULL) + (tv.tv_usec / 1000);
 
 }
 

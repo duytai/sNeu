@@ -48,7 +48,10 @@ class Fuzzer {
 
   public:
     u64 total_execs;
+    u64 total_ints;
+    u64 total_durations;
     u64 exec_ms;
+    u64 start_time;
     TestCase tc;
     u8 virgin_bits[MAP_SIZE],
        virgin_loss[MAP_SIZE],
