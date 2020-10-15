@@ -32,7 +32,7 @@ class TestSuite {
     void compute_branch_loss(vector<TestCase>&);
     vector<TestCase> load_from_dir(char* dir);
     vector<TestCase> smart_mutate(vector<TestCase>&);
-    vector<TestCase> deterministic(vector<char>);
+    vector<TestCase> deterministic(vector<char>, u32);
 };
 
 #endif

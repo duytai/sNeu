@@ -154,7 +154,7 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
   return tcs;
 }
 
-vector<TestCase> TestSuite::deterministic(vector<char> buffer) {
+vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
   vector<TestCase> tcs;
 
   /* FLIP1 */
@@ -195,6 +195,15 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer) {
     FLIP_BIT(buffer.data(), i + 3);
   }
 
+  u8 eff_map[EFF_ALEN(buffer.size())];
+  u32 eff_cnt = 1;
+  eff_map[0] = 1;
+
+  if (EFF_APOS(buffer.size() - 1) != 0) {
+    eff_map[EFF_APOS(buffer.size() - 1)] = 1;
+    eff_cnt += 1;
+  }
+
   /* FLIP8 */
   for (u32 i = 0; i < buffer.size(); i += 1) {
     buffer.data()[i] ^= 0xFF;
@@ -202,11 +211,23 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer) {
     if (this->fuzzer->tc.hnb) {
       tcs.push_back(this->fuzzer->tc);
     }
+    if (!eff_map[EFF_APOS(i)]) {
+      u32 new_cksum = hash32(this->fuzzer->trace_bits, MAP_SIZE, HASH_CONST);
+      if (new_cksum != cksum) {
+        eff_map[EFF_APOS(i)] = 1;
+        eff_cnt += 1;
+      }
+    }
     buffer.data()[i] ^= 0xFF;
+  }
+
+  if (eff_cnt != EFF_ALEN(buffer.size()) && eff_cnt * 100 / EFF_ALEN(buffer.size()) > EFF_MAX_PERC) {
+    memset(eff_map, 1, EFF_ALEN(buffer.size()));
   }
 
   /* FLIP16 */
   for (u32 i = 0; i < buffer.size() - 1; i += 1) {
+    if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)]) continue;
     *(u16*)(buffer.data() + i) ^= 0xFFFF;
     this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
     if (this->fuzzer->tc.hnb) {
@@ -217,6 +238,8 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer) {
 
   /* FLIP32 */
   for (u32 i = 0; i < buffer.size() - 3; i += 1) {
+    if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)] &&
+        !eff_map[EFF_APOS(i + 2)] && !eff_map[EFF_APOS(i + 3)]) continue;
     *(u32*)(buffer.data() + i) ^= 0xFFFFFFFF;
     this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
     if (this->fuzzer->tc.hnb) {
@@ -227,6 +250,8 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer) {
 
   /* ARITH8 */
   for (u32 i = 0; i < buffer.size(); i += 1) {
+    if (!eff_map[EFF_APOS(i)]) continue;
+
     u8 orig = buffer[i];
     for (u32 j = 0; j < ARITH_MAX; j += 1) {
       u8 r1 = orig ^ (orig + j);
@@ -251,6 +276,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer) {
 
   /* ARITH16 */
   for (u32 i = 0; i < buffer.size() - 1; i += 1) {
+    if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)]) continue;
     u16 orig = *(u16*)(buffer.data() + i);
     for (u32 j = 0; j < ARITH_MAX; j += 1) {
       u16 r1 = orig ^ (orig + j),
@@ -292,6 +318,8 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer) {
 
   /* ARITH32 */
   for (u32 i = 0; i < buffer.size() - 3; i += 1) {
+    if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)] &&
+        !eff_map[EFF_APOS(i + 2)] && !eff_map[EFF_APOS(i + 3)]) continue;
     u32 orig = *(u32*)(buffer.data() + i);
     for (u32 j = 0; j < ARITH_MAX; j += 1) {
       u32 r1 = orig ^ (orig + j),
@@ -333,6 +361,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer) {
 
   /* INST8 */
   for (u32 i = 0; i < buffer.size(); i += 1) {
+    if (!eff_map[EFF_APOS(i)]) continue;
     u8 orig = buffer[i];
     for (u32 j = 0; j < sizeof(interesting_8); j += 1) {
       if (could_be_bitflip(orig ^ (u8)interesting_8[j]) ||
@@ -350,6 +379,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer) {
 
   /* INST16 */
   for (u32 i = 0; i < buffer.size() - 1; i += 1) {
+    if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)]) continue;
     u16 orig = *(u16*)(buffer.data() + i);
 
     for (u32 j = 0; j < sizeof(interesting_16) / 2; j += 1) {
@@ -379,6 +409,9 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer) {
 
   /* INST32 */
   for (u32 i = 0; i < buffer.size() - 3; i += 1) {
+    if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)] &&
+        !eff_map[EFF_APOS(i + 2)] && !eff_map[EFF_APOS(i + 3)]) continue;
+
     u32 orig = *(u32*)(buffer.data() + i);
 
     for (u32 j = 0; j < sizeof(interesting_32) / 4; j += 1) {
@@ -412,12 +445,14 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer) {
 
 void TestSuite::mutate(void) {
 
-  vector<TestCase> tcs;
   char* tmp = "+------+[----------],,,,,,,,,,,";
   vector<char> buffer(tmp, tmp + strlen(tmp));
 
+  this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+  u32 cksum = hash32(this->fuzzer->trace_bits, MAP_SIZE, HASH_CONST);
+
   u32 total_execs = this->fuzzer->total_execs;
-  tcs = this->deterministic(buffer);
+  auto tcs = this->deterministic(buffer, cksum);
   OKF("DET %lu", tcs.size());
   OKF("total_execs: %d", this->fuzzer->total_execs - total_execs);
 }

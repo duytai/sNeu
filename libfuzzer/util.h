@@ -192,4 +192,9 @@ static u8 could_be_interest(u32 old_val, u32 new_val, u8 blen, u8 check_le) {
     _arf[(_bf) >> 3] ^= (128 >> ((_bf) & 7)); \
   } while (0)
 
+#define EFF_APOS(_p)          ((_p) >> EFF_MAP_SCALE2)
+#define EFF_REM(_x)           ((_x) & ((1 << EFF_MAP_SCALE2) - 1))
+#define EFF_ALEN(_l)          (EFF_APOS(_l) + !!EFF_REM(_l))
+#define EFF_SPAN_ALEN(_p, _l) (EFF_APOS((_p) + (_l) - 1) - EFF_APOS(_p) + 1)
+
 #endif
