@@ -2,6 +2,7 @@ set(sources
   types.h
   debug.h
   config.h
+  util.h
   hash.h
   fuzzer.h
   fuzzer.cpp

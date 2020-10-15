@@ -2,6 +2,7 @@
 #include <libfuzzer/testsuite.h>
 #include <libfuzzer/fuzzer.h>
 #include <libfuzzer/net.h>
+#include <libfuzzer/util.h>
 #include <filesystem>
 #include <algorithm>
 #include <fstream>
@@ -155,6 +156,7 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
 
 vector<TestCase> TestSuite::deterministic(vector<char> buffer, Stage stage) {
   vector<TestCase> tcs;
+
   switch (stage) {
     case Stage::STAGE_FLIP8:
       for (u32 i = 0; i < buffer.size(); i += 1) {
@@ -196,14 +198,14 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, Stage stage) {
         for (u32 j = 0; j < ARITH_MAX; j += 1) {
           u8 r1 = orig ^ (orig + j);
           u8 r2 = orig ^ (orig - j);
-          if (r1) {
+          if (!could_be_bitflip(r1)) {
             buffer[i] = orig + j;
             this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
             if (this->fuzzer->tc.hnb) {
               tcs.push_back(this->fuzzer->tc);
             }
           }
-          if (r2) {
+          if (!could_be_bitflip(r2)) {
             buffer[i] = orig - j;
             this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
             if (this->fuzzer->tc.hnb) {
@@ -223,28 +225,28 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, Stage stage) {
               r3 = orig ^ SWAP16(SWAP16(orig) + j),
               r4 = orig ^ SWAP16(SWAP16(orig) - j);
 
-          if ((orig & 0xff) + j > 0xff && r1) {
+          if ((orig & 0xff) + j > 0xff && !could_be_bitflip(r1)) {
             *(u16*)(buffer.data() + i) = orig + j;
             this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
             if (this->fuzzer->tc.hnb) {
               tcs.push_back(this->fuzzer->tc);
             }
           }
-          if ((orig & 0xff) < j && r2) {
+          if ((orig & 0xff) < j && !could_be_bitflip(r2)) {
             *(u16*)(buffer.data() + i) = orig - j;
             this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
             if (this->fuzzer->tc.hnb) {
               tcs.push_back(this->fuzzer->tc);
             }
           }
-          if ((orig >> 8) + j > 0xff && r3) {
+          if ((orig >> 8) + j > 0xff && !could_be_bitflip(r3)) {
             *(u16*)(buffer.data() + i) = SWAP16(SWAP16(orig) + j);
             this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
             if (this->fuzzer->tc.hnb) {
               tcs.push_back(this->fuzzer->tc);
             }
           }
-          if ((orig >> 8) < j && r4) {
+          if ((orig >> 8) < j && !could_be_bitflip(r4)) {
             *(u16*)(buffer.data() + i) = SWAP16(SWAP16(orig) - j);
             this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
             if (this->fuzzer->tc.hnb) {
@@ -264,28 +266,28 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, Stage stage) {
               r3 = orig ^ SWAP32(SWAP32(orig) + j),
               r4 = orig ^ SWAP32(SWAP32(orig) - j);
 
-          if ((orig & 0xffff) + j > 0xffff && r1) {
+          if ((orig & 0xffff) + j > 0xffff && !could_be_bitflip(r1)) {
             *(u32*)(buffer.data() + i) = orig + j;
             this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
             if (this->fuzzer->tc.hnb) {
               tcs.push_back(this->fuzzer->tc);
             }
           }
-          if ((orig & 0xffff) < j && r2) {
+          if ((orig & 0xffff) < j && !could_be_bitflip(r2)) {
             *(u32*)(buffer.data() + i) = orig - j;
             this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
             if (this->fuzzer->tc.hnb) {
               tcs.push_back(this->fuzzer->tc);
             }
           }
-          if ((SWAP32(orig) & 0xffff) + j > 0xffff && r3) {
+          if ((SWAP32(orig) & 0xffff) + j > 0xffff && !could_be_bitflip(r3)) {
             *(u32*)(buffer.data() + i) = SWAP32(SWAP32(orig) + j);
             this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
             if (this->fuzzer->tc.hnb) {
               tcs.push_back(this->fuzzer->tc);
             }
           }
-          if ((SWAP32(orig) & 0xffff) < j && r4) {
+          if ((SWAP32(orig) & 0xffff) < j && !could_be_bitflip(r4)) {
             *(u32*)(buffer.data() + i) = SWAP32(SWAP32(orig) - j);
             this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
             if (this->fuzzer->tc.hnb) {
@@ -296,7 +298,20 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, Stage stage) {
         *(u32*)(buffer.data() + i) = orig;
       }
       break;
+    case Stage::STAGE_INTEREST8:
+      for (u32 i = 0; i < buffer.size(); i += 1) {
+        u8 orig = buffer[i];
+        for (u32 j = 0; j < sizeof(interesting_8); j += 1) {
+          if (!(orig ^ interesting_8[j])) continue;
+        }
+      }
+      break;
+    case Stage::STAGE_INTEREST16:
+      break;
+    case Stage::STAGE_INTEREST32:
+      break;
   }
+
   return tcs;
 }
 
@@ -334,5 +349,20 @@ void TestSuite::mutate(void) {
   total_execs = this->fuzzer->total_execs;
   tcs = this->deterministic(buffer, Stage::STAGE_ARITH32);
   OKF("ARITH32 %lu", tcs.size());
+  OKF("total_execs: %d", this->fuzzer->total_execs - total_execs);
+
+  total_execs = this->fuzzer->total_execs;
+  tcs = this->deterministic(buffer, Stage::STAGE_INTEREST8);
+  OKF("STAGE_INTEREST8 %lu", tcs.size());
+  OKF("total_execs: %d", this->fuzzer->total_execs - total_execs);
+
+  total_execs = this->fuzzer->total_execs;
+  tcs = this->deterministic(buffer, Stage::STAGE_INTEREST16);
+  OKF("STAGE_INTEREST16 %lu", tcs.size());
+  OKF("total_execs: %d", this->fuzzer->total_execs - total_execs);
+
+  total_execs = this->fuzzer->total_execs;
+  tcs = this->deterministic(buffer, Stage::STAGE_INTEREST32);
+  OKF("STAGE_INTEREST32 %lu", tcs.size());
   OKF("total_execs: %d", this->fuzzer->total_execs - total_execs);
 }
