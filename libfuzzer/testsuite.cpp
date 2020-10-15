@@ -158,6 +158,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
   vector<TestCase> tcs;
 
   /* FLIP1 */
+  this->fuzzer->stage = "flip1";
   for (u32 i = 0; i < buffer.size() << 3; i += 1) {
     FLIP_BIT(buffer.data(), i);
     this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
@@ -168,6 +169,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
   }
 
   /* FLIP2 */
+  this->fuzzer->stage = "flip2";
   for (u32 i = 0; i < (buffer.size() << 3) - 1; i += 1) {
     FLIP_BIT(buffer.data(), i);
     FLIP_BIT(buffer.data(), i + 1);
@@ -180,6 +182,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
   }
 
   /* FLIP4 */
+  this->fuzzer->stage = "flip4";
   for (u32 i = 0; i < (buffer.size() << 3) - 3; i += 1) {
     FLIP_BIT(buffer.data(), i);
     FLIP_BIT(buffer.data(), i + 1);
@@ -207,6 +210,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
   }
 
   /* FLIP8 */
+  this->fuzzer->stage = "flip8";
   for (u32 i = 0; i < buffer.size(); i += 1) {
     buffer.data()[i] ^= 0xFF;
     this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
@@ -230,29 +234,36 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
   }
 
   /* FLIP16 */
-  for (u32 i = 0; i < buffer.size() - 1; i += 1) {
-    if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)]) continue;
-    *(u16*)(buffer.data() + i) ^= 0xFFFF;
-    this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-    if (this->fuzzer->tc.hnb) {
-      tcs.push_back(this->fuzzer->tc);
+  if (buffer.size() >= 2) {
+    this->fuzzer->stage = "flip16";
+    for (u32 i = 0; i < buffer.size() - 1; i += 1) {
+      if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)]) continue;
+      *(u16*)(buffer.data() + i) ^= 0xFFFF;
+      this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+      if (this->fuzzer->tc.hnb) {
+        tcs.push_back(this->fuzzer->tc);
+      }
+      *(u16*)(buffer.data() + i) ^= 0xFFFF;
     }
-    *(u16*)(buffer.data() + i) ^= 0xFFFF;
   }
 
   /* FLIP32 */
-  for (u32 i = 0; i < buffer.size() - 3; i += 1) {
-    if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)] &&
-        !eff_map[EFF_APOS(i + 2)] && !eff_map[EFF_APOS(i + 3)]) continue;
-    *(u32*)(buffer.data() + i) ^= 0xFFFFFFFF;
-    this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-    if (this->fuzzer->tc.hnb) {
-      tcs.push_back(this->fuzzer->tc);
+  if (buffer.size() >= 4) {
+    this->fuzzer->stage = "flip32";
+    for (u32 i = 0; i < buffer.size() - 3; i += 1) {
+      if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)] &&
+          !eff_map[EFF_APOS(i + 2)] && !eff_map[EFF_APOS(i + 3)]) continue;
+      *(u32*)(buffer.data() + i) ^= 0xFFFFFFFF;
+      this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+      if (this->fuzzer->tc.hnb) {
+        tcs.push_back(this->fuzzer->tc);
+      }
+      *(u32*)(buffer.data() + i) ^= 0xFFFFFFFF;
     }
-    *(u32*)(buffer.data() + i) ^= 0xFFFFFFFF;
   }
 
   /* ARITH8 */
+  this->fuzzer->stage = "airth8";
   for (u32 i = 0; i < buffer.size(); i += 1) {
     if (!eff_map[EFF_APOS(i)]) continue;
 
@@ -279,91 +290,98 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
   }
 
   /* ARITH16 */
-  for (u32 i = 0; i < buffer.size() - 1; i += 1) {
-    if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)]) continue;
-    u16 orig = *(u16*)(buffer.data() + i);
-    for (u32 j = 0; j < ARITH_MAX; j += 1) {
-      u16 r1 = orig ^ (orig + j),
-          r2 = orig ^ (orig - j),
-          r3 = orig ^ SWAP16(SWAP16(orig) + j),
-          r4 = orig ^ SWAP16(SWAP16(orig) - j);
+  if (buffer.size() >= 2) {
+    this->fuzzer->stage = "airth16";
+    for (u32 i = 0; i < buffer.size() - 1; i += 1) {
+      if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)]) continue;
+      u16 orig = *(u16*)(buffer.data() + i);
+      for (u32 j = 0; j < ARITH_MAX; j += 1) {
+        u16 r1 = orig ^ (orig + j),
+            r2 = orig ^ (orig - j),
+            r3 = orig ^ SWAP16(SWAP16(orig) + j),
+            r4 = orig ^ SWAP16(SWAP16(orig) - j);
 
-      if ((orig & 0xff) + j > 0xff && !could_be_bitflip(r1)) {
-        *(u16*)(buffer.data() + i) = orig + j;
-        this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-        if (this->fuzzer->tc.hnb) {
-          tcs.push_back(this->fuzzer->tc);
+        if ((orig & 0xff) + j > 0xff && !could_be_bitflip(r1)) {
+          *(u16*)(buffer.data() + i) = orig + j;
+          this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+          if (this->fuzzer->tc.hnb) {
+            tcs.push_back(this->fuzzer->tc);
+          }
         }
-      }
-      if ((orig & 0xff) < j && !could_be_bitflip(r2)) {
-        *(u16*)(buffer.data() + i) = orig - j;
-        this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-        if (this->fuzzer->tc.hnb) {
-          tcs.push_back(this->fuzzer->tc);
+        if ((orig & 0xff) < j && !could_be_bitflip(r2)) {
+          *(u16*)(buffer.data() + i) = orig - j;
+          this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+          if (this->fuzzer->tc.hnb) {
+            tcs.push_back(this->fuzzer->tc);
+          }
         }
-      }
-      if ((orig >> 8) + j > 0xff && !could_be_bitflip(r3)) {
-        *(u16*)(buffer.data() + i) = SWAP16(SWAP16(orig) + j);
-        this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-        if (this->fuzzer->tc.hnb) {
-          tcs.push_back(this->fuzzer->tc);
+        if ((orig >> 8) + j > 0xff && !could_be_bitflip(r3)) {
+          *(u16*)(buffer.data() + i) = SWAP16(SWAP16(orig) + j);
+          this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+          if (this->fuzzer->tc.hnb) {
+            tcs.push_back(this->fuzzer->tc);
+          }
         }
-      }
-      if ((orig >> 8) < j && !could_be_bitflip(r4)) {
-        *(u16*)(buffer.data() + i) = SWAP16(SWAP16(orig) - j);
-        this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-        if (this->fuzzer->tc.hnb) {
-          tcs.push_back(this->fuzzer->tc);
+        if ((orig >> 8) < j && !could_be_bitflip(r4)) {
+          *(u16*)(buffer.data() + i) = SWAP16(SWAP16(orig) - j);
+          this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+          if (this->fuzzer->tc.hnb) {
+            tcs.push_back(this->fuzzer->tc);
+          }
         }
+        *(u16*)(buffer.data() + i) = orig;
       }
-      *(u16*)(buffer.data() + i) = orig;
     }
   }
 
   /* ARITH32 */
-  for (u32 i = 0; i < buffer.size() - 3; i += 1) {
-    if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)] &&
-        !eff_map[EFF_APOS(i + 2)] && !eff_map[EFF_APOS(i + 3)]) continue;
-    u32 orig = *(u32*)(buffer.data() + i);
-    for (u32 j = 0; j < ARITH_MAX; j += 1) {
-      u32 r1 = orig ^ (orig + j),
-          r2 = orig ^ (orig - j),
-          r3 = orig ^ SWAP32(SWAP32(orig) + j),
-          r4 = orig ^ SWAP32(SWAP32(orig) - j);
+  if (buffer.size() >= 4) {
+    this->fuzzer->stage = "airth32";
+    for (u32 i = 0; i < buffer.size() - 3; i += 1) {
+      if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)] &&
+          !eff_map[EFF_APOS(i + 2)] && !eff_map[EFF_APOS(i + 3)]) continue;
+      u32 orig = *(u32*)(buffer.data() + i);
+      for (u32 j = 0; j < ARITH_MAX; j += 1) {
+        u32 r1 = orig ^ (orig + j),
+            r2 = orig ^ (orig - j),
+            r3 = orig ^ SWAP32(SWAP32(orig) + j),
+            r4 = orig ^ SWAP32(SWAP32(orig) - j);
 
-      if ((orig & 0xffff) + j > 0xffff && !could_be_bitflip(r1)) {
-        *(u32*)(buffer.data() + i) = orig + j;
-        this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-        if (this->fuzzer->tc.hnb) {
-          tcs.push_back(this->fuzzer->tc);
+        if ((orig & 0xffff) + j > 0xffff && !could_be_bitflip(r1)) {
+          *(u32*)(buffer.data() + i) = orig + j;
+          this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+          if (this->fuzzer->tc.hnb) {
+            tcs.push_back(this->fuzzer->tc);
+          }
         }
-      }
-      if ((orig & 0xffff) < j && !could_be_bitflip(r2)) {
-        *(u32*)(buffer.data() + i) = orig - j;
-        this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-        if (this->fuzzer->tc.hnb) {
-          tcs.push_back(this->fuzzer->tc);
+        if ((orig & 0xffff) < j && !could_be_bitflip(r2)) {
+          *(u32*)(buffer.data() + i) = orig - j;
+          this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+          if (this->fuzzer->tc.hnb) {
+            tcs.push_back(this->fuzzer->tc);
+          }
         }
-      }
-      if ((SWAP32(orig) & 0xffff) + j > 0xffff && !could_be_bitflip(r3)) {
-        *(u32*)(buffer.data() + i) = SWAP32(SWAP32(orig) + j);
-        this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-        if (this->fuzzer->tc.hnb) {
-          tcs.push_back(this->fuzzer->tc);
+        if ((SWAP32(orig) & 0xffff) + j > 0xffff && !could_be_bitflip(r3)) {
+          *(u32*)(buffer.data() + i) = SWAP32(SWAP32(orig) + j);
+          this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+          if (this->fuzzer->tc.hnb) {
+            tcs.push_back(this->fuzzer->tc);
+          }
         }
-      }
-      if ((SWAP32(orig) & 0xffff) < j && !could_be_bitflip(r4)) {
-        *(u32*)(buffer.data() + i) = SWAP32(SWAP32(orig) - j);
-        this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-        if (this->fuzzer->tc.hnb) {
-          tcs.push_back(this->fuzzer->tc);
+        if ((SWAP32(orig) & 0xffff) < j && !could_be_bitflip(r4)) {
+          *(u32*)(buffer.data() + i) = SWAP32(SWAP32(orig) - j);
+          this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+          if (this->fuzzer->tc.hnb) {
+            tcs.push_back(this->fuzzer->tc);
+          }
         }
+        *(u32*)(buffer.data() + i) = orig;
       }
-      *(u32*)(buffer.data() + i) = orig;
     }
   }
 
   /* INST8 */
+  this->fuzzer->stage = "inst8";
   for (u32 i = 0; i < buffer.size(); i += 1) {
     if (!eff_map[EFF_APOS(i)]) continue;
     u8 orig = buffer[i];
@@ -382,66 +400,72 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
   }
 
   /* INST16 */
-  for (u32 i = 0; i < buffer.size() - 1; i += 1) {
-    if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)]) continue;
-    u16 orig = *(u16*)(buffer.data() + i);
+  if (buffer.size() >= 2) {
+    this->fuzzer->stage = "inst16";
+    for (u32 i = 0; i < buffer.size() - 1; i += 1) {
+      if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)]) continue;
+      u16 orig = *(u16*)(buffer.data() + i);
 
-    for (u32 j = 0; j < sizeof(interesting_16) / 2; j += 1) {
-      if (!could_be_bitflip(orig ^ (u16)interesting_16[j]) &&
-          !could_be_arith(orig, (u16)interesting_16[j], 2) &&
-          !could_be_interest(orig, (u16)interesting_16[j], 2, 0)) {
-        *(u16*)(buffer.data() + i) = interesting_16[j];
-        this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-        if (this->fuzzer->tc.hnb) {
-          tcs.push_back(this->fuzzer->tc);
+      for (u32 j = 0; j < sizeof(interesting_16) / 2; j += 1) {
+        if (!could_be_bitflip(orig ^ (u16)interesting_16[j]) &&
+            !could_be_arith(orig, (u16)interesting_16[j], 2) &&
+            !could_be_interest(orig, (u16)interesting_16[j], 2, 0)) {
+          *(u16*)(buffer.data() + i) = interesting_16[j];
+          this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+          if (this->fuzzer->tc.hnb) {
+            tcs.push_back(this->fuzzer->tc);
+          }
+        }
+        if ((u16)interesting_16[j] != SWAP16(interesting_16[j]) &&
+            !could_be_bitflip(orig ^ SWAP16(interesting_16[j])) &&
+            !could_be_arith(orig, SWAP16(interesting_16[j]), 2) &&
+            !could_be_interest(orig, SWAP16(interesting_16[j]), 2, 1)) {
+          *(u16*)(buffer.data() + i) = SWAP16(interesting_16[j]);
+          this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+          if (this->fuzzer->tc.hnb) {
+            tcs.push_back(this->fuzzer->tc);
+          }
         }
       }
-      if ((u16)interesting_16[j] != SWAP16(interesting_16[j]) &&
-          !could_be_bitflip(orig ^ SWAP16(interesting_16[j])) &&
-          !could_be_arith(orig, SWAP16(interesting_16[j]), 2) &&
-          !could_be_interest(orig, SWAP16(interesting_16[j]), 2, 1)) {
-        *(u16*)(buffer.data() + i) = SWAP16(interesting_16[j]);
-        this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-        if (this->fuzzer->tc.hnb) {
-          tcs.push_back(this->fuzzer->tc);
-        }
-      }
+
+      *(u16*)(buffer.data() + i) = orig;
     }
-
-    *(u16*)(buffer.data() + i) = orig;
   }
 
   /* INST32 */
-  for (u32 i = 0; i < buffer.size() - 3; i += 1) {
-    if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)] &&
-        !eff_map[EFF_APOS(i + 2)] && !eff_map[EFF_APOS(i + 3)]) continue;
+  if (buffer.size() >= 4) {
+    this->fuzzer->stage = "inst32";
+    for (u32 i = 0; i < buffer.size() - 3; i += 1) {
+      if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)] &&
+          !eff_map[EFF_APOS(i + 2)] && !eff_map[EFF_APOS(i + 3)]) continue;
 
-    u32 orig = *(u32*)(buffer.data() + i);
+      u32 orig = *(u32*)(buffer.data() + i);
 
-    for (u32 j = 0; j < sizeof(interesting_32) / 4; j += 1) {
-      if (!could_be_bitflip(orig ^ (u32)interesting_32[j]) &&
-          !could_be_arith(orig, interesting_32[j], 4) &&
-          !could_be_interest(orig, interesting_32[j], 4, 0)) {
-        *(u32*)(buffer.data()+ i) = interesting_32[j];
-        this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-        if (this->fuzzer->tc.hnb) {
-          tcs.push_back(this->fuzzer->tc);
-        }
-      } 
+      for (u32 j = 0; j < sizeof(interesting_32) / 4; j += 1) {
+        if (!could_be_bitflip(orig ^ (u32)interesting_32[j]) &&
+            !could_be_arith(orig, interesting_32[j], 4) &&
+            !could_be_interest(orig, interesting_32[j], 4, 0)) {
+          *(u32*)(buffer.data()+ i) = interesting_32[j];
+          this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+          if (this->fuzzer->tc.hnb) {
+            tcs.push_back(this->fuzzer->tc);
+          }
+        } 
 
-      if ((u32)interesting_32[j] != SWAP32(interesting_32[j]) &&
-          !could_be_bitflip(orig ^ SWAP32(interesting_32[j])) &&
-          !could_be_arith(orig, SWAP32(interesting_32[j]), 4) &&
-          !could_be_interest(orig, SWAP32(interesting_32[j]), 4, 1)) {
-        *(u32*)(buffer.data() + i) = SWAP32(interesting_32[j]);
-        this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-        if (this->fuzzer->tc.hnb) {
-          tcs.push_back(this->fuzzer->tc);
+        if ((u32)interesting_32[j] != SWAP32(interesting_32[j]) &&
+            !could_be_bitflip(orig ^ SWAP32(interesting_32[j])) &&
+            !could_be_arith(orig, SWAP32(interesting_32[j]), 4) &&
+            !could_be_interest(orig, SWAP32(interesting_32[j]), 4, 1)) {
+          *(u32*)(buffer.data() + i) = SWAP32(interesting_32[j]);
+          this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+          if (this->fuzzer->tc.hnb) {
+            tcs.push_back(this->fuzzer->tc);
+          }
         }
       }
-    }
 
-    *(u32*)(buffer.data() + i) = orig;
+      *(u32*)(buffer.data() + i) = orig;
+    }
   }
 
   return tcs;
@@ -449,13 +473,15 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
 
 void TestSuite::mutate(void) {
 
-  char* tmp = "+++++++++++++[-----------]]]]----------------]";
-  vector<char> buffer(tmp, tmp + strlen(tmp));
-
-  this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-  u32 cksum = hash32(this->fuzzer->trace_bits, MAP_SIZE, HASH_CONST);
-
-  u32 total_execs = this->fuzzer->total_execs;
-  auto tcs = this->deterministic(buffer, cksum);
+  auto tcs = this->load_from_dir(this->opt.in_dir);
+  this->fuzzer->queue_size = tcs.size();
+  this->fuzzer->queue_idx = 0;
+  for (u32 i = 0; i < tcs.size(); i += 1) {
+    this->fuzzer->queue_idx += 1;
+    this->fuzzer->run_target(tcs[i].buffer, EXEC_TIMEOUT);
+    u32 cksum = hash32(this->fuzzer->trace_bits, MAP_SIZE, HASH_CONST);
+    this->deterministic(tcs[i].buffer, cksum);
+  }
   this->fuzzer->show_info(1);
+
 }

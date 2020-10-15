@@ -282,12 +282,14 @@ void Fuzzer::handle_stop_sig(void) {
 #define UP "\x1b[A"
 #define DOWN "\n"
 void Fuzzer::show_info(u8 force) {
-  if (this->total_execs == 1) SAYF(DOWN DOWN);
+  if (this->total_execs == 1) SAYF(DOWN DOWN DOWN DOWN);
   if ((this->total_execs % 1000) == 0 || force) {
     u64 duration = get_cur_time() - this->start_time;
-    SAYF(UP UP);
+    SAYF(UP UP UP UP);
     SAYF("  Execs\t: %llu/%llu\n", this->total_ints, this->total_execs);
     SAYF("  Speed\t: %.0f\n", this->total_execs / (duration / 1000.0));
+    SAYF("  Queue\t: %d/%d\n", this->queue_idx, this->queue_size);
+    SAYF("  Stage\t: %s\n", this->stage.c_str());
   }
 }
 
