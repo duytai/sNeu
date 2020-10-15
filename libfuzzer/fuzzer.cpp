@@ -183,7 +183,6 @@ u8 Fuzzer::run_target(vector<char>& mem, u32 timeout) {
   memset(this->loss_bits, 255, MAP_SIZE);
   MEM_BARRIER();
   this->child_timed_out = 0;
-  this->hnb = 0;
 
   if ((res = write(this->fsrv_ctl_fd, &prev_timed_out, 4)) != 4) {
     FATAL("Unable to request new process from fork server (OOM?)");
@@ -214,11 +213,10 @@ u8 Fuzzer::run_target(vector<char>& mem, u32 timeout) {
   MEM_BARRIER();
 
   this->classify_counts();
-  this->hnb = this->has_new_bits();
   this->update_loss();
 
   vector<u8> loss_bits(this->loss_bits, this->loss_bits + MAP_SIZE);
-  this->tc = { .buffer = mem, .loss_bits = loss_bits, .hnb = this->hnb };
+  this->tc = { .buffer = mem, .loss_bits = loss_bits, .hnb = this->has_new_bits() };
 
   if (WIFSIGNALED(status)) {
     kill_signal = WTERMSIG(status);

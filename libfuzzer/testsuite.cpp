@@ -71,6 +71,7 @@ void TestSuite::compute_branch_loss(vector<TestCase>& testcases) {
  * */
 
 vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
+
   vector<torch::Tensor> xs, ys;
   vector<TestCase> tcs;
   u32 max_len = 0,
@@ -113,7 +114,7 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
     torch::Tensor loss = torch::mse_loss(prediction, torch::stack(ys));
     loss.backward();
     optimizer.step();
-    if (epoch + 1 == 1000) {
+    if (epoch + 1 == mutate_epoch) {
       OKF("\tEpoch\t: %d", epoch);
       OKF("\tLoss\t: %.4f", loss.item<float>());
     }
@@ -136,7 +137,7 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
       auto temp = x.mul(255.0).to(torch::kUInt8);
       vector buffer((char*) temp.data_ptr(), (char*) temp.data_ptr() + temp.numel());
       this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-      if (this->fuzzer->hnb) {
+      if (this->fuzzer->tc.hnb) {
         num_found += 1;
         tcs.push_back(this->fuzzer->tc);
       }
@@ -152,7 +153,199 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
   return tcs;
 }
 
+vector<TestCase> TestSuite::flip(vector<char> buffer, Stage stage) {
+
+  vector<TestCase> tcs;
+
+  switch (stage) {
+    case Stage::STAGE_FLIP8:
+      for (u32 i = 0; i < buffer.size(); i += 1) {
+        buffer.data()[i] ^= 0xFF;
+        this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+        if (this->fuzzer->tc.hnb) {
+          tcs.push_back(this->fuzzer->tc);
+        }
+        buffer.data()[i] ^= 0xFF;
+      }
+      break;
+
+    case Stage::STAGE_FLIP16:
+      if (buffer.size() < 2) break;
+      for (u32 i = 0; i < buffer.size() - 1; i += 1) {
+        *(u16*)(buffer.data() + i) ^= 0xFFFF;
+        this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+        if (this->fuzzer->tc.hnb) {
+          tcs.push_back(this->fuzzer->tc);
+        }
+        *(u16*)(buffer.data() + i) ^= 0xFFFF;
+      }
+      break;
+
+    case Stage::STAGE_FLIP32:
+      if (buffer.size() < 3) break;
+      for (u32 i = 0; i < buffer.size() - 3; i += 1) {
+        *(u32*)(buffer.data() + i) ^= 0xFFFFFFFF;
+        this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+        if (this->fuzzer->tc.hnb) {
+          tcs.push_back(this->fuzzer->tc);
+        }
+        *(u32*)(buffer.data() + i) ^= 0xFFFFFFFF;
+      }
+      break;
+  }
+
+  return tcs;
+}
+
+vector<TestCase> TestSuite::arith(vector<char> buffer, Stage stage) {
+
+  vector<TestCase> tcs;
+
+  switch (stage) {
+    case Stage::STAGE_ARITH8:
+      for (u32 i = 0; i < buffer.size(); i += 1) {
+        u8 orig = buffer[i];
+        for (u32 j = 0; j < ARITH_MAX; j += 1) {
+          u8 r1 = orig ^ (orig + j);
+          u8 r2 = orig ^ (orig - j);
+          if (r1) {
+            buffer[i] = orig + j;
+            this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+            if (this->fuzzer->tc.hnb) {
+              tcs.push_back(this->fuzzer->tc);
+            }
+          }
+          if (r2) {
+            buffer[i] = orig - j;
+            this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+            if (this->fuzzer->tc.hnb) {
+              tcs.push_back(this->fuzzer->tc);
+            }
+          }
+        }
+        buffer[i] = orig;
+      }
+      break;
+    case Stage::STAGE_ARITH16:
+      for (u32 i = 0; i < buffer.size() - 1; i += 1) {
+        u16 orig = *(u16*)(buffer.data() + i);
+        for (u32 j = 0; j < ARITH_MAX; j += 1) {
+          u16 r1 = orig ^ (orig + j),
+              r2 = orig ^ (orig - j),
+              r3 = orig ^ SWAP16(SWAP16(orig) + j),
+              r4 = orig ^ SWAP16(SWAP16(orig) - j);
+
+          if ((orig & 0xff) + j > 0xff && r1) {
+            *(u16*)(buffer.data() + i) = orig + j;
+            this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+            if (this->fuzzer->tc.hnb) {
+              tcs.push_back(this->fuzzer->tc);
+            }
+          }
+          if ((orig & 0xff) < j && r2) {
+            *(u16*)(buffer.data() + i) = orig - j;
+            this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+            if (this->fuzzer->tc.hnb) {
+              tcs.push_back(this->fuzzer->tc);
+            }
+          }
+          if ((orig >> 8) + j > 0xff && r3) {
+            *(u16*)(buffer.data() + i) = SWAP16(SWAP16(orig) + j);
+            this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+            if (this->fuzzer->tc.hnb) {
+              tcs.push_back(this->fuzzer->tc);
+            }
+          }
+          if ((orig >> 8) < j && r4) {
+            *(u16*)(buffer.data() + i) = SWAP16(SWAP16(orig) - j);
+            this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+            if (this->fuzzer->tc.hnb) {
+              tcs.push_back(this->fuzzer->tc);
+            }
+          }
+        }
+        *(u16*)(buffer.data() + i) = orig;
+      }
+      break;
+    case Stage::STAGE_ARITH32:
+      for (u32 i = 0; i < buffer.size() - 3; i += 1) {
+        u32 orig = *(u32*)(buffer.data() + i);
+        for (u32 j = 0; j < ARITH_MAX; j += 1) {
+          u16 r1 = orig ^ (orig + j),
+              r2 = orig ^ (orig - j),
+              r3 = orig ^ SWAP32(SWAP32(orig) + j),
+              r4 = orig ^ SWAP32(SWAP32(orig) - j);
+
+          if ((orig & 0xffff) + j > 0xffff && r1) {
+            *(u32*)(buffer.data() + i) = orig + j;
+            this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+            if (this->fuzzer->tc.hnb) {
+              tcs.push_back(this->fuzzer->tc);
+            }
+          }
+          if ((orig & 0xffff) < j && r2) {
+            *(u32*)(buffer.data() + i) = orig - j;
+            this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+            if (this->fuzzer->tc.hnb) {
+              tcs.push_back(this->fuzzer->tc);
+            }
+          }
+          if ((SWAP32(orig) & 0xffff) + j > 0xffff && r3) {
+            *(u32*)(buffer.data() + i) = SWAP32(SWAP32(orig) + j);
+            this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+            if (this->fuzzer->tc.hnb) {
+              tcs.push_back(this->fuzzer->tc);
+            }
+          }
+          if ((SWAP32(orig) & 0xffff) < j && r4) {
+            *(u32*)(buffer.data() + i) = SWAP32(SWAP32(orig) - j);
+            this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+            if (this->fuzzer->tc.hnb) {
+              tcs.push_back(this->fuzzer->tc);
+            }
+          }
+        }
+        *(u32*)(buffer.data() + i) = orig;
+      }
+      break;
+  }
+
+  return tcs;
+}
+
 void TestSuite::mutate(void) {
-  auto tcs = this->load_from_dir(this->opt.in_dir);
-  this->smart_mutate(tcs);
+
+  vector<TestCase> tcs;
+  char* tmp = "+------+[------------------------,,,,,,]";
+  vector<char> buffer(tmp, tmp + strlen(tmp));
+
+  u32 total_execs = this->fuzzer->total_execs;
+  tcs = this->flip(buffer, Stage::STAGE_FLIP8);
+  OKF("FLIP8 %lu", tcs.size());
+  OKF("total_execs: %d", this->fuzzer->total_execs - total_execs);
+
+  total_execs = this->fuzzer->total_execs;
+  tcs = this->flip(buffer, Stage::STAGE_FLIP16);
+  OKF("FLIP16 %lu", tcs.size());
+  OKF("total_execs: %d", this->fuzzer->total_execs - total_execs);
+
+  total_execs = this->fuzzer->total_execs;
+  tcs = this->flip(buffer, Stage::STAGE_FLIP32);
+  OKF("FLIP32 %lu", tcs.size());
+  OKF("total_execs: %d", this->fuzzer->total_execs - total_execs);
+
+  total_execs = this->fuzzer->total_execs;
+  tcs = this->arith(buffer, Stage::STAGE_ARITH8);
+  OKF("ARITH8 %lu", tcs.size());
+  OKF("total_execs: %d", this->fuzzer->total_execs - total_execs);
+
+  total_execs = this->fuzzer->total_execs;
+  tcs = this->arith(buffer, Stage::STAGE_ARITH16);
+  OKF("ARITH16 %lu", tcs.size());
+  OKF("total_execs: %d", this->fuzzer->total_execs - total_execs);
+
+  total_execs = this->fuzzer->total_execs;
+  tcs = this->arith(buffer, Stage::STAGE_ARITH32);
+  OKF("ARITH32 %lu", tcs.size());
+  OKF("total_execs: %d", this->fuzzer->total_execs - total_execs);
 }

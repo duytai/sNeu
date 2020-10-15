@@ -50,8 +50,7 @@ class Fuzzer {
     u64 total_execs;
     u64 exec_ms;
     TestCase tc;
-    u8 hnb,
-       virgin_bits[MAP_SIZE],
+    u8 virgin_bits[MAP_SIZE],
        virgin_loss[MAP_SIZE],
        * loss_bits,
        * trace_bits;
