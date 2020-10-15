@@ -217,6 +217,7 @@ u8 Fuzzer::run_target(vector<char>& mem, u32 timeout) {
 
   vector<u8> loss_bits(this->loss_bits, this->loss_bits + MAP_SIZE);
   this->tc = { .buffer = mem, .loss_bits = loss_bits, .hnb = this->has_new_bits() };
+  this->show_info(0);
 
   if (WIFSIGNALED(status)) {
     kill_signal = WTERMSIG(status);
@@ -273,6 +274,19 @@ void Fuzzer::update_loss(void) {
 void Fuzzer::handle_stop_sig(void) {
   if (this->child_pid > 0) kill(this->child_pid, SIGKILL);
   if (this->forksrv_pid > 0) kill(this->forksrv_pid, SIGKILL);
+}
+
+#define UP "\x1b[A"
+#define DOWN "\n"
+void Fuzzer::show_info(u8 force) {
+  if (this->total_execs == 1) {
+    SAYF(DOWN DOWN);
+  } 
+  if ((this->total_execs % 1000) == 0 || force) {
+    SAYF(UP UP);
+    SAYF("Total execs: %llu\n", this->total_execs);
+    SAYF("Total uuuu: %llu\n", this->total_execs);
+  }
 }
 
 Fuzzer::~Fuzzer() {

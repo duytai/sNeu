@@ -457,6 +457,5 @@ void TestSuite::mutate(void) {
 
   u32 total_execs = this->fuzzer->total_execs;
   auto tcs = this->deterministic(buffer, cksum);
-  OKF("DET %lu", tcs.size());
-  OKF("total_execs: %d", this->fuzzer->total_execs - total_execs);
+  this->fuzzer->show_info(1);
 }
