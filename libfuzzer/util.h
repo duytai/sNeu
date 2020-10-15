@@ -186,4 +186,10 @@ static u8 could_be_interest(u32 old_val, u32 new_val, u8 blen, u8 check_le) {
 
 }
 
+#define FLIP_BIT(_ar, _b) do { \
+    u8* _arf = (u8*)(_ar); \
+    u32 _bf = (_b); \
+    _arf[(_bf) >> 3] ^= (128 >> ((_bf) & 7)); \
+  } while (0)
+
 #endif

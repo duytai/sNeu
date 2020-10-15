@@ -8,6 +8,9 @@
 using namespace std;
 
 typedef enum {
+  STAGE_FLIP1,
+  STAGE_FLIP2,
+  STAGE_FLIP4,
   STAGE_FLIP8,
   STAGE_FLIP16,
   STAGE_FLIP32,
@@ -29,7 +32,7 @@ class TestSuite {
     void compute_branch_loss(vector<TestCase>&);
     vector<TestCase> load_from_dir(char* dir);
     vector<TestCase> smart_mutate(vector<TestCase>&);
-    vector<TestCase> deterministic(vector<char>, Stage);
+    vector<TestCase> deterministic(vector<char>);
 };
 
 #endif
