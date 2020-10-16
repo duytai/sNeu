@@ -205,7 +205,6 @@ u8 Fuzzer::run_target(vector<char>& mem, u32 timeout) {
   if (!WIFSTOPPED(status)) this->child_pid = 0;
 
   getitimer(ITIMER_REAL, &it);
-  this->exec_ms = (u64) timeout - (it.it_value.tv_sec * 1000 + it.it_value.tv_usec / 1000);
   it.it_value.tv_sec = 0;
   it.it_value.tv_usec = 0;
   setitimer(ITIMER_REAL, &it, NULL);
@@ -282,14 +281,15 @@ void Fuzzer::handle_stop_sig(void) {
 #define UP "\x1b[A"
 #define DOWN "\n"
 void Fuzzer::show_info(u8 force) {
+  u64 duration = (get_cur_time() - this->start_time) / 1000;
   if (this->total_execs == 1) SAYF(DOWN DOWN DOWN DOWN);
-  if ((this->total_execs % 1000) == 0 || force) {
-    u64 duration = get_cur_time() - this->start_time;
+  if (duration != this->total_time || force) {
     SAYF(UP UP UP UP);
     SAYF("  Execs\t: %llu/%llu\n", this->total_ints, this->total_execs);
-    SAYF("  Speed\t: %.0f\n", this->total_execs / (duration / 1000.0));
+    SAYF("  Speed\t: %llu\n", this->total_execs / (duration + 1));
     SAYF("  Queue\t: %d/%d\n", this->queue_idx, this->queue_size);
-    SAYF("  Stage\t: %s\n", this->stage.c_str());
+    SAYF("  Stage\t: %s\n", this->stage);
+    this->total_time = duration;
   }
 }
 

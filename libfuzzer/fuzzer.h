@@ -49,12 +49,11 @@ class Fuzzer {
   public:
     u64 total_execs;
     u64 total_ints;
-    u64 total_durations;
-    u64 exec_ms;
+    u64 total_time;
     u64 start_time;
     u32 queue_size;
     u32 queue_idx;
-    string stage = "init";
+    char stage[20] = "init";
     TestCase tc;
     u8 virgin_bits[MAP_SIZE],
        virgin_loss[MAP_SIZE],

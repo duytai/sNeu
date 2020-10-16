@@ -52,8 +52,6 @@ void TestSuite::compute_branch_loss(vector<TestCase>& testcases) {
     }
   }
 
-  OKF("\tInst branches\t: %lu", inst_branches.size());
-
   for (auto& t: testcases) {
     u8 loss = 255;
     for (auto br : inst_branches) {
@@ -81,14 +79,12 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
       num_found = 0,
       num_execs  = 0;
 
-  ACTF("Smart Mutation");
   this->compute_branch_loss(testcases);
   for (auto t : testcases) {
     if (t.min_loss != 255) {
       max_len = max((u32) t.buffer.size(), max_len);
     }
   }
-  OKF("\tMaxLen\t: %d", max_len);
 
   for (auto t : testcases) {
     if (t.min_loss != 255) {
@@ -102,27 +98,22 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
       ys.push_back(y);
     }
   }
-  OKF("\tHas\t: %lu ts", testcases.size());
-  OKF("\tTrain\t: %lu ts", xs.size());
 
   auto net = std::make_shared<Net>(max_len);
   torch::optim::SGD optimizer(net->parameters(), /*lr=*/0.01);
 
   /* Training */
+  snprintf(this->fuzzer->stage, 20, "train/%d/%lu", max_len, xs.size());
+  this->fuzzer->show_info(1);
   for (u32 epoch = 0; epoch < train_epoch; epoch += 1) {
     optimizer.zero_grad();
     torch::Tensor prediction = net->forward(torch::stack(xs));
     torch::Tensor loss = torch::mse_loss(prediction, torch::stack(ys));
     loss.backward();
     optimizer.step();
-    if (epoch + 1 == mutate_epoch) {
-      OKF("\tEpoch\t: %d", epoch);
-      OKF("\tLoss\t: %.4f", loss.item<float>());
-    }
   }
 
-  OKF("\tTrain finished, its time to mutate");
-
+  snprintf(this->fuzzer->stage, 20, "smart mutate");
   for (auto x : xs) {
     /* Compute grads for input x */
     x.set_requires_grad(true);
@@ -150,7 +141,6 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
     }
   }
 
-  OKF("\tExecs\t: %d/%d", num_found, num_execs);
   return tcs;
 }
 
@@ -158,7 +148,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
   vector<TestCase> tcs;
 
   /* FLIP1 */
-  this->fuzzer->stage = "flip1";
+  snprintf(this->fuzzer->stage, 20, "flip1");
   for (u32 i = 0; i < buffer.size() << 3; i += 1) {
     FLIP_BIT(buffer.data(), i);
     this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
@@ -169,7 +159,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
   }
 
   /* FLIP2 */
-  this->fuzzer->stage = "flip2";
+  snprintf(this->fuzzer->stage, 20, "flip2");
   for (u32 i = 0; i < (buffer.size() << 3) - 1; i += 1) {
     FLIP_BIT(buffer.data(), i);
     FLIP_BIT(buffer.data(), i + 1);
@@ -182,7 +172,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
   }
 
   /* FLIP4 */
-  this->fuzzer->stage = "flip4";
+  snprintf(this->fuzzer->stage, 20, "flip4");
   for (u32 i = 0; i < (buffer.size() << 3) - 3; i += 1) {
     FLIP_BIT(buffer.data(), i);
     FLIP_BIT(buffer.data(), i + 1);
@@ -210,7 +200,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
   }
 
   /* FLIP8 */
-  this->fuzzer->stage = "flip8";
+  snprintf(this->fuzzer->stage, 20, "flip8");
   for (u32 i = 0; i < buffer.size(); i += 1) {
     buffer.data()[i] ^= 0xFF;
     this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
@@ -235,7 +225,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
 
   /* FLIP16 */
   if (buffer.size() >= 2) {
-    this->fuzzer->stage = "flip16";
+    snprintf(this->fuzzer->stage, 20, "flip16");
     for (u32 i = 0; i < buffer.size() - 1; i += 1) {
       if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)]) continue;
       *(u16*)(buffer.data() + i) ^= 0xFFFF;
@@ -249,7 +239,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
 
   /* FLIP32 */
   if (buffer.size() >= 4) {
-    this->fuzzer->stage = "flip32";
+    snprintf(this->fuzzer->stage, 20, "flip32");
     for (u32 i = 0; i < buffer.size() - 3; i += 1) {
       if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)] &&
           !eff_map[EFF_APOS(i + 2)] && !eff_map[EFF_APOS(i + 3)]) continue;
@@ -263,7 +253,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
   }
 
   /* ARITH8 */
-  this->fuzzer->stage = "airth8";
+  snprintf(this->fuzzer->stage, 20, "airth8");
   for (u32 i = 0; i < buffer.size(); i += 1) {
     if (!eff_map[EFF_APOS(i)]) continue;
 
@@ -291,7 +281,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
 
   /* ARITH16 */
   if (buffer.size() >= 2) {
-    this->fuzzer->stage = "airth16";
+    snprintf(this->fuzzer->stage, 20, "airth16");
     for (u32 i = 0; i < buffer.size() - 1; i += 1) {
       if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)]) continue;
       u16 orig = *(u16*)(buffer.data() + i);
@@ -336,7 +326,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
 
   /* ARITH32 */
   if (buffer.size() >= 4) {
-    this->fuzzer->stage = "airth32";
+    snprintf(this->fuzzer->stage, 20, "airth32");
     for (u32 i = 0; i < buffer.size() - 3; i += 1) {
       if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)] &&
           !eff_map[EFF_APOS(i + 2)] && !eff_map[EFF_APOS(i + 3)]) continue;
@@ -381,7 +371,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
   }
 
   /* INST8 */
-  this->fuzzer->stage = "inst8";
+  snprintf(this->fuzzer->stage, 20, "inst8");
   for (u32 i = 0; i < buffer.size(); i += 1) {
     if (!eff_map[EFF_APOS(i)]) continue;
     u8 orig = buffer[i];
@@ -401,7 +391,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
 
   /* INST16 */
   if (buffer.size() >= 2) {
-    this->fuzzer->stage = "inst16";
+    snprintf(this->fuzzer->stage, 20, "inst16");
     for (u32 i = 0; i < buffer.size() - 1; i += 1) {
       if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)]) continue;
       u16 orig = *(u16*)(buffer.data() + i);
@@ -434,7 +424,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
 
   /* INST32 */
   if (buffer.size() >= 4) {
-    this->fuzzer->stage = "inst32";
+    snprintf(this->fuzzer->stage, 20, "inst32");
     for (u32 i = 0; i < buffer.size() - 3; i += 1) {
       if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)] &&
           !eff_map[EFF_APOS(i + 2)] && !eff_map[EFF_APOS(i + 3)]) continue;
@@ -476,12 +466,17 @@ void TestSuite::mutate(void) {
   auto tcs = this->load_from_dir(this->opt.in_dir);
   this->fuzzer->queue_size = tcs.size();
   this->fuzzer->queue_idx = 0;
-  for (u32 i = 0; i < tcs.size(); i += 1) {
-    this->fuzzer->queue_idx += 1;
-    this->fuzzer->run_target(tcs[i].buffer, EXEC_TIMEOUT);
-    u32 cksum = hash32(this->fuzzer->trace_bits, MAP_SIZE, HASH_CONST);
-    this->deterministic(tcs[i].buffer, cksum);
+  this->fuzzer->show_info(1);
+  while (1) {
+    auto ll = this->smart_mutate(tcs);
+    if (ll.size() > 0) break;
   }
+  // for (u32 i = 0; i < tcs.size(); i += 1) {
+    // this->fuzzer->queue_idx += 1;
+    // this->fuzzer->run_target(tcs[i].buffer, EXEC_TIMEOUT);
+    // u32 cksum = hash32(this->fuzzer->trace_bits, MAP_SIZE, HASH_CONST);
+    // this->deterministic(tcs[i].buffer, cksum);
+  // }
   this->fuzzer->show_info(1);
 
 }
