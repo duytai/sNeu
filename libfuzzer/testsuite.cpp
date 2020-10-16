@@ -14,6 +14,7 @@ using namespace std::filesystem;
 TestSuite::TestSuite(Fuzzer* fuzzer, SNeuOptions opt) {
   this->fuzzer = fuzzer;
   this->fuzzer->load_opt(opt);
+  this->fuzzer->render_output = true;
   this->opt = opt;
 }
 
@@ -75,7 +76,7 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
   vector<TestCase> tcs;
   u32 max_len = 0,
       train_epoch = 1000,
-      mutate_epoch = 50,
+      mutate_epoch = 100,
       num_found = 0,
       num_execs  = 0;
 
@@ -104,7 +105,7 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
 
   /* Training */
   snprintf(this->fuzzer->stage, 20, "train/%d/%lu", max_len, xs.size());
-  this->fuzzer->show_info(1);
+  this->fuzzer->show_stats(1);
   for (u32 epoch = 0; epoch < train_epoch; epoch += 1) {
     optimizer.zero_grad();
     torch::Tensor prediction = net->forward(torch::stack(xs));
@@ -466,17 +467,15 @@ void TestSuite::mutate(void) {
   auto tcs = this->load_from_dir(this->opt.in_dir);
   this->fuzzer->queue_size = tcs.size();
   this->fuzzer->queue_idx = 0;
-  this->fuzzer->show_info(1);
-  while (1) {
-    auto ll = this->smart_mutate(tcs);
-    if (ll.size() > 0) break;
-  }
+  this->fuzzer->show_stats(1);
+  auto ll = this->smart_mutate(tcs);
+  this->fuzzer->show_stats(1);
+  OKF("LL: %d", ll.size());
   // for (u32 i = 0; i < tcs.size(); i += 1) {
     // this->fuzzer->queue_idx += 1;
     // this->fuzzer->run_target(tcs[i].buffer, EXEC_TIMEOUT);
     // u32 cksum = hash32(this->fuzzer->trace_bits, MAP_SIZE, HASH_CONST);
     // this->deterministic(tcs[i].buffer, cksum);
   // }
-  this->fuzzer->show_info(1);
 
 }

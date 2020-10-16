@@ -53,6 +53,7 @@ class Fuzzer {
     u64 start_time;
     u32 queue_size;
     u32 queue_idx;
+    bool render_output;
     char stage[20] = "init";
     TestCase tc;
     u8 virgin_bits[MAP_SIZE],
@@ -72,7 +73,7 @@ class Fuzzer {
     void init_forkserver(void);
     void update_loss(void);
     void handle_stop_sig(void);
-    void show_info(u8 force); 
+    void show_stats(u8 force); 
     u8 has_new_bits(void);
     u8 run_target(vector<char>& mem, u32 exec_tmout);
 };
