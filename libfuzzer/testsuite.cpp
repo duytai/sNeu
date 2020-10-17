@@ -14,7 +14,7 @@ using namespace std::filesystem;
 TestSuite::TestSuite(Fuzzer* fuzzer, SNeuOptions opt) {
   this->fuzzer = fuzzer;
   this->fuzzer->load_opt(opt);
-  this->fuzzer->render_output = true;
+  this->fuzzer->render_output = false;
   this->opt = opt;
 }
 
@@ -504,21 +504,22 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
 
 void TestSuite::mutate(void) {
 
-  auto tcs = this->load_from_dir(this->opt.in_dir);
-  this->fuzzer->queue_size = tcs.size();
-  this->fuzzer->queue_idx = 0;
+  auto full_tcs = this->load_from_dir(this->opt.in_dir);
+  this->fuzzer->queue_size = full_tcs.size();
+  this->fuzzer->queue_idx = full_tcs.size();
   this->fuzzer->show_stats(1);
   while (true) {
-    tcs = this->smart_mutate(tcs);
-    u32 idx = 0;
-    while (idx < tcs.size()) {
-      this->fuzzer->queue_size = tcs.size();
+    /* Smart mutate and add to queue */
+    auto tcs = this->smart_mutate(full_tcs);
+    full_tcs.insert(full_tcs.end(), tcs.begin(), tcs.end());
+    /* Deterministic stage */
+    while (this->fuzzer->queue_idx < full_tcs.size()) {
+      this->fuzzer->queue_size = full_tcs.size();
       this->fuzzer->queue_idx += 1;
-      this->fuzzer->run_target(tcs[idx].buffer, EXEC_TIMEOUT);
+      this->fuzzer->run_target(full_tcs[this->fuzzer->queue_idx].buffer, EXEC_TIMEOUT);
       u32 cksum = hash32(this->fuzzer->trace_bits, MAP_SIZE, HASH_CONST);
-      auto sub_tcs = this->deterministic(tcs[idx].buffer, cksum);
-      tcs.insert(tcs.end(), sub_tcs.begin(), sub_tcs.end());
-      idx += 1;
+      auto tcs = this->deterministic(full_tcs[this->fuzzer->queue_idx].buffer, cksum);
+      full_tcs.insert(full_tcs.end(), tcs.begin(), tcs.end());
     }
   }
 
