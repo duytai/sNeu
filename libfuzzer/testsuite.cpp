@@ -155,32 +155,32 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
   }
 
   /* Compute grads for input x and muate the whole input */
-  // snprintf(this->fuzzer->stage, 20, "mutate_all", num_interests);
-  // this->fuzzer->show_stats(1);
-  // for (auto x : xs) {
-    // x = x.clone();
-    // x.set_requires_grad(true);
-    // for (u32 epoch = 0; epoch < 100; epoch += 1) {
-      // optimizer.zero_grad();
-      // torch::Tensor prediction = net->forward(x);
-      // torch::Tensor loss = torch::mse_loss(prediction, torch::zeros(1));
-      // loss.backward();
-      // x.set_requires_grad(false);
-      // x.add_(x.grad());
+  snprintf(this->fuzzer->stage, 20, "mutate_all", num_interests);
+  this->fuzzer->show_stats(1);
+  for (auto x : xs) {
+    x = x.clone();
+    x.set_requires_grad(true);
+    for (u32 epoch = 0; epoch < 100; epoch += 1) {
+      optimizer.zero_grad();
+      torch::Tensor prediction = net->forward(x);
+      torch::Tensor loss = torch::mse_loss(prediction, torch::zeros(1));
+      loss.backward();
+      x.set_requires_grad(false);
+      x.add_(x.grad());
 
       /* Got result, run target */
-      // auto temp = x.mul(255.0).to(torch::kUInt8);
-      // vector buffer((char*) temp.data_ptr(), (char*) temp.data_ptr() + temp.numel());
-      // this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-      // if (this->fuzzer->tc.hnb) {
-        // tcs.push_back(this->fuzzer->tc);
-      // }
+      auto temp = x.mul(255.0).to(torch::kUInt8);
+      vector buffer((char*) temp.data_ptr(), (char*) temp.data_ptr() + temp.numel());
+      this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+      if (this->fuzzer->tc.hnb) {
+        tcs.push_back(this->fuzzer->tc);
+      }
 
       /* Zero grad for next round */
-      // x.grad().zero_();
-      // x.set_requires_grad(true);
-    // }
-  // }
+      x.grad().zero_();
+      x.set_requires_grad(true);
+    }
+  }
 
   return tcs;
 }
