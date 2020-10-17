@@ -35,7 +35,7 @@ vector<TestCase> TestSuite::load_from_dir(char* dir) {
   return tcs;
 }
 
-void TestSuite::compute_branch_loss(vector<TestCase>& testcases) {
+u32 TestSuite::compute_branch_loss(vector<TestCase>& testcases) {
   vector<u32> inst_branches;
   u32 i = 0;
 
@@ -62,6 +62,8 @@ void TestSuite::compute_branch_loss(vector<TestCase>& testcases) {
     }
     t.min_loss = loss;
   }
+
+  return inst_branches.size();
 }
 
 /*
@@ -75,12 +77,9 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
   vector<torch::Tensor> xs, ys;
   vector<TestCase> tcs;
   u32 max_len = 0,
-      train_epoch = 1000,
-      mutate_epoch = 100,
-      num_found = 0,
-      num_execs  = 0;
+      train_epoch = 1000;
 
-  this->compute_branch_loss(testcases);
+  u32 num_interests = this->compute_branch_loss(testcases);
   for (auto t : testcases) {
     if (t.min_loss != 255) {
       max_len = max((u32) t.buffer.size(), max_len);
@@ -114,33 +113,74 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
     optimizer.step();
   }
 
-  snprintf(this->fuzzer->stage, 20, "smart mutate");
+  /* Compute grads for input x and mutate topk */
+  snprintf(this->fuzzer->stage, 20, "mutate_topk");
+  this->fuzzer->show_stats(1);
   for (auto x : xs) {
-    /* Compute grads for input x */
+    x = x.clone();
     x.set_requires_grad(true);
-    for (u32 epoch = 0; epoch < mutate_epoch; epoch += 1) {
-      optimizer.zero_grad();
-      torch::Tensor prediction = net->forward(x);
-      torch::Tensor loss = torch::mse_loss(prediction, torch::zeros(1));
-      loss.backward();
-      x.set_requires_grad(false);
-      x.add_(x.grad());
+    optimizer.zero_grad();
+    torch::Tensor prediction = net->forward(x);
+    torch::Tensor loss = torch::mse_loss(prediction, torch::zeros(1));
+    loss.backward();
+    auto sign = x.grad().sign();
+    auto topk = x.grad().abs().topk(5);
+    torch::Tensor indices = get<1>(topk);
+    x = x * 255;
+    torch::Tensor inc = torch::zeros(x.sizes()[0]);
+    for (u32 i = 0; i < 5; i += 1) {
+      int idx = indices[i].item<int>();
+      inc[idx] = sign[idx];
+    }
 
-      /* Got result, run target */
-      auto temp = x.mul(255.0).to(torch::kUInt8);
-      vector buffer((char*) temp.data_ptr(), (char*) temp.data_ptr() + temp.numel());
+    torch::Tensor x1 = x.clone();
+    for (u32 i = 0; i < 255; i += 1) {
+      x1 = (x1 + inc).clamp(0, 255);
+      vector buffer((char*) x1.data_ptr(), (char*) x1.data_ptr() + x1.numel());
       this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
       if (this->fuzzer->tc.hnb) {
-        num_found += 1;
         tcs.push_back(this->fuzzer->tc);
       }
-      num_execs += 1;
+    }
 
-      /* Zero grad for next round */
-      x.grad().zero_();
-      x.set_requires_grad(true);
+    torch::Tensor x2 = x.clone();
+    for (u32 i = 0; i < 255; i += 1) {
+      x2 = (x2 - inc).clamp(0, 255);
+      vector buffer((char*) x2.data_ptr(), (char*) x2.data_ptr() + x2.numel());
+      this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+      if (this->fuzzer->tc.hnb) {
+        tcs.push_back(this->fuzzer->tc);
+      }
     }
   }
+
+  /* Compute grads for input x and muate the whole input */
+  // snprintf(this->fuzzer->stage, 20, "mutate_all", num_interests);
+  // this->fuzzer->show_stats(1);
+  // for (auto x : xs) {
+    // x = x.clone();
+    // x.set_requires_grad(true);
+    // for (u32 epoch = 0; epoch < 100; epoch += 1) {
+      // optimizer.zero_grad();
+      // torch::Tensor prediction = net->forward(x);
+      // torch::Tensor loss = torch::mse_loss(prediction, torch::zeros(1));
+      // loss.backward();
+      // x.set_requires_grad(false);
+      // x.add_(x.grad());
+
+      /* Got result, run target */
+      // auto temp = x.mul(255.0).to(torch::kUInt8);
+      // vector buffer((char*) temp.data_ptr(), (char*) temp.data_ptr() + temp.numel());
+      // this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+      // if (this->fuzzer->tc.hnb) {
+        // tcs.push_back(this->fuzzer->tc);
+      // }
+
+      /* Zero grad for next round */
+      // x.grad().zero_();
+      // x.set_requires_grad(true);
+    // }
+  // }
 
   return tcs;
 }
@@ -468,14 +508,18 @@ void TestSuite::mutate(void) {
   this->fuzzer->queue_size = tcs.size();
   this->fuzzer->queue_idx = 0;
   this->fuzzer->show_stats(1);
-  auto ll = this->smart_mutate(tcs);
-  this->fuzzer->show_stats(1);
-  OKF("LL: %d", ll.size());
-  // for (u32 i = 0; i < tcs.size(); i += 1) {
-    // this->fuzzer->queue_idx += 1;
-    // this->fuzzer->run_target(tcs[i].buffer, EXEC_TIMEOUT);
-    // u32 cksum = hash32(this->fuzzer->trace_bits, MAP_SIZE, HASH_CONST);
-    // this->deterministic(tcs[i].buffer, cksum);
-  // }
+  while (true) {
+    tcs = this->smart_mutate(tcs);
+    u32 idx = 0;
+    while (idx < tcs.size()) {
+      this->fuzzer->queue_size = tcs.size();
+      this->fuzzer->queue_idx += 1;
+      this->fuzzer->run_target(tcs[idx].buffer, EXEC_TIMEOUT);
+      u32 cksum = hash32(this->fuzzer->trace_bits, MAP_SIZE, HASH_CONST);
+      auto sub_tcs = this->deterministic(tcs[idx].buffer, cksum);
+      tcs.insert(tcs.end(), sub_tcs.begin(), sub_tcs.end());
+      idx += 1;
+    }
+  }
 
 }
