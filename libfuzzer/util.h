@@ -5,6 +5,14 @@
 #include <libfuzzer/config.h>
 #include <sys/time.h>
 
+typedef struct {
+  bool use_stdin = true;
+  char* in_dir = NULL;
+  char* out_dir = NULL;
+  char* out_file = ".cur_input";
+  char** target_argv = NULL;
+} SNeuOptions;
+
 static s8  interesting_8[]  = { INTERESTING_8 };
 static s16 interesting_16[] = { INTERESTING_8, INTERESTING_16 };
 static s32 interesting_32[] = { INTERESTING_8, INTERESTING_16, INTERESTING_32 };

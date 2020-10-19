@@ -122,7 +122,7 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
   }
 
   /* Compute grads for input x and mutate topk */
-  stats.stage = "mutate topk";
+  stats.stage = "mtopk";
   this->fuzzer->show_stats(1);
   for (auto x : xs) {
     x = x.clone();
@@ -160,7 +160,7 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
   }
 
   /* Compute grads for input x and muate the whole input */
-  stats.stage = "mutate all";
+  stats.stage = "mall";
   this->fuzzer->show_stats(1);
   for (auto x : xs) {
     x = x.clone();
@@ -508,11 +508,31 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
   return tcs;
 }
 
+// void TestSuite::write_testcases(vector<TestCase>& tcs) {
+  // auto& stats = this->fuzzer->stats;
+  // string out_dir = string(this->opt.out_dir);
+  // for (auto& tc : tcs) {
+    // char idx_str[7];
+    // char src_str[7];
+    // snprintf(idx_str, 7, "%06d", stats.test_idx);
+    // snprintf(src_str, 7, "%06d", stats.queue_idx);
+//
+    // TODO: mall, mtopk dont have src:000000
+    // string fname = out_dir + "/id:" + idx_str + ",src:" + src_str + ",op:" + stats.stage;
+    // std::ofstream ofs(fname);
+    // ofs << tc.buffer.data();
+    // ofs.close();
+    // stats.test_idx += 1;
+  // }
+// }
+
 void TestSuite::mutate(void) {
 
   auto tcs = this->load_from_dir(this->opt.in_dir);
   u32 idx = tcs.size();
   auto& stats = this->fuzzer->stats;
+
+  stats.test_idx = tcs.size();
 
   while (1) {
     auto tmp = this->smart_mutate(tcs);

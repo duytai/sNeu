@@ -1,7 +1,7 @@
 #include <libfuzzer/fuzzer.h>
 #include <libfuzzer/testsuite.h>
 #include <libfuzzer/debug.h>
-#include <libutil/util.h>
+#include <libfuzzer/util.h>
 
 #include <signal.h>
 #include <string.h>
@@ -24,13 +24,20 @@ SNeuOptions parse_arguments(int argc, char* argv[]) {
     if (strcmp(opt, "-i") == 0 && argv[i + 1] != NULL) {
       sneu_opt.in_dir = argv[i + 1];
       i += 2;
-    } else break;
+      continue;
+    }
+    if (strcmp(opt, "-o") == 0 && argv[i + 1] != NULL) {
+      sneu_opt.out_dir = argv[i + 1];
+      i += 2;
+      continue;
+    }
+    break;
   }
 
   sneu_opt.target_argv = argv + i;
 
-  if (sneu_opt.in_dir == NULL || sneu_opt.target_argv[0] == NULL) {
-    SAYF("  Usage: %s -i <in_dir> <app>\n", argv[0]);
+  if (sneu_opt.in_dir == NULL || sneu_opt.out_dir == NULL ||  sneu_opt.target_argv[0] == NULL) {
+    SAYF("  Usage: %s -i <in_dir> -o <out_dir> <app>\n", argv[0]);
     exit(EXIT_SUCCESS);
   }
 

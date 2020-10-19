@@ -6,7 +6,7 @@
 #include <libfuzzer/debug.h>
 #include <libfuzzer/hash.h>
 #include <libfuzzer/fuzzer.h>
-#include <libutil/util.h>
+#include <libfuzzer/util.h>
 
 #include <vector>
 #include <string>
@@ -35,6 +35,8 @@ typedef struct {
   u32 input_size;
   u32 total_inputs;
   u32 uniq_loss;
+  /* test cases */
+  u32 test_idx;
 } FuzzStats;
 
 class Fuzzer {
