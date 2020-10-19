@@ -28,7 +28,7 @@ class TestSuite {
 
   public:
     TestSuite(Fuzzer* fuzzer, SNeuOptions opt);
-    u32 compute_branch_loss(vector<TestCase>&);
+    void compute_branch_loss(vector<TestCase>&);
     vector<TestCase> load_from_dir(char* dir);
     vector<TestCase> smart_mutate(vector<TestCase>&);
     vector<TestCase> deterministic(vector<char>, u32);

@@ -35,7 +35,8 @@ vector<TestCase> TestSuite::load_from_dir(char* dir) {
   return tcs;
 }
 
-u32 TestSuite::compute_branch_loss(vector<TestCase>& testcases) {
+void TestSuite::compute_branch_loss(vector<TestCase>& testcases) {
+  auto& stats = this->fuzzer->stats;
   vector<u32> inst_branches;
   u32 i = 0;
 
@@ -63,7 +64,8 @@ u32 TestSuite::compute_branch_loss(vector<TestCase>& testcases) {
     t.min_loss = loss;
   }
 
-  return inst_branches.size();
+  stats.uncovered_branches = inst_branches.size();
+
 }
 
 /*
@@ -74,18 +76,20 @@ u32 TestSuite::compute_branch_loss(vector<TestCase>& testcases) {
 
 vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
 
+  set<u8> losses;
   vector<torch::Tensor> xs, ys;
   vector<TestCase> tcs;
   auto& stats = this->fuzzer->stats;
   u32 max_len = 0,
       train_epoch = 1000;
 
-  u32 num_interests = this->compute_branch_loss(testcases);
+  this->compute_branch_loss(testcases);
   for (auto t : testcases) {
     if (t.min_loss != 255) {
       max_len = max((u32) t.buffer.size(), max_len);
     }
   }
+  stats.input_size = max_len;
 
   for (auto t : testcases) {
     if (t.min_loss != 255) {
@@ -97,8 +101,11 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
       y[0] = t.min_loss / 64.0;
       xs.push_back(x);
       ys.push_back(y);
+      losses.insert(t.min_loss);
     }
   }
+  stats.total_inputs = ys.size();
+  stats.uniq_loss = losses.size();
 
   auto net = std::make_shared<Net>(max_len);
   torch::optim::SGD optimizer(net->parameters(), /*lr=*/0.01);
@@ -526,5 +533,7 @@ void TestSuite::mutate(void) {
 
       idx += 1;
     }
+
+    stats.cycles += 1;
   }
 }

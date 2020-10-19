@@ -21,14 +21,20 @@ typedef struct {
 } TestCase;
 
 typedef struct {
+  string stage = "init";
+  bool render_output;
   u64 total_execs;
   u64 total_ints;
   u64 total_time;
   u64 start_time;
   u32 queue_size;
   u32 queue_idx;
-  bool render_output;
-  string stage = "init";
+  u32 cycles;
+  /* nural network */
+  u32 uncovered_branches;
+  u32 input_size;
+  u32 total_inputs;
+  u32 uniq_loss;
 } FuzzStats;
 
 class Fuzzer {

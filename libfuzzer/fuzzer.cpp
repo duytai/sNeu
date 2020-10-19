@@ -280,17 +280,31 @@ void Fuzzer::handle_stop_sig(void) {
 
 #define UP "\x1b[A"
 #define DOWN "\n"
+#define H10 "──────────"
 void Fuzzer::show_stats(u8 force) {
-  if (!this->stats.render_output) return;
-  u64 duration = (get_cur_time() - this->stats.start_time) / 1000;
-  if (this->stats.total_execs == 1) SAYF(DOWN DOWN DOWN DOWN);
-  if (duration != this->stats.total_time || force) {
-    SAYF(UP UP UP UP);
-    SAYF("  Execs\t: %llu/%llu\n", this->stats.total_ints, this->stats.total_execs);
-    SAYF("  Speed\t: %llu\n", this->stats.total_execs / (duration + 1));
-    SAYF("  Queue\t: %d/%d\n", this->stats.queue_idx, this->stats.queue_size);
-    SAYF("  Stage\t: %s\n", this->stats.stage.c_str());
-    this->stats.total_time = duration;
+  auto& stats = this->stats;
+  if (!stats.render_output) return;
+  u64 duration = (get_cur_time() - stats.start_time) / 1000;
+  if (stats.total_execs == 1) SAYF(DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN);
+  if (duration != stats.total_time || force) {
+    u32 hours = duration / 60 / 60;
+    u32 mins = duration / 60;
+    u32 secs = duration - mins * 60 - hours * 60 * 60;
+    SAYF(UP UP UP UP UP UP UP UP UP UP UP UP UP);
+    SAYF(H10 " Summary " H10 "\n");
+    SAYF("  Time       \t: %02d:%02d:%02d\n", hours, mins, secs);
+    SAYF("  Execs      \t: %llu\n", stats.total_execs);
+    SAYF("  Fav        \t: %llu\n", stats.total_ints);
+    SAYF("  Speed      \t: %llu\n", stats.total_execs / (duration + 1));
+    SAYF("  Queue      \t: %d/%d\n", stats.queue_idx, stats.queue_size);
+    SAYF("  Stage      \t: %s\n", stats.stage.c_str());
+    SAYF("  Cycles     \t: %d\n", stats.cycles);
+    SAYF(H10 " Network " H10 "\n");
+    SAYF("  Branches   \t: %d\n", stats.uncovered_branches);
+    SAYF("  InputSize  \t: %d\n", stats.input_size);
+    SAYF("  TotalInputs\t: %d\n", stats.total_inputs);
+    SAYF("  UniqLoss   \t: %d\n", stats.uniq_loss);
+    stats.total_time = duration;
   }
 }
 
