@@ -31,7 +31,7 @@ Fuzzer::Fuzzer(void) {
   this->init_count_class16();
   this->setup_fds();
   this->setup_shm();
-  this->start_time = get_cur_time();
+  this->stats.start_time = get_cur_time();
 }
 
 void Fuzzer::load_opt(SNeuOptions opt) {
@@ -210,7 +210,7 @@ u8 Fuzzer::run_target(vector<char>& mem, u32 timeout) {
   setitimer(ITIMER_REAL, &it, NULL);
 
   prev_timed_out = this->child_timed_out;
-  this->total_execs ++;
+  this->stats.total_execs ++;
   MEM_BARRIER();
 
   this->classify_counts();
@@ -218,7 +218,7 @@ u8 Fuzzer::run_target(vector<char>& mem, u32 timeout) {
 
   vector<u8> loss_bits(this->loss_bits, this->loss_bits + MAP_SIZE);
   this->tc = { .buffer = mem, .loss_bits = loss_bits, .hnb = this->has_new_bits() };
-  this->total_ints += this->tc.hnb > 0 ? 1 : 0;
+  this->stats.total_ints += this->tc.hnb > 0 ? 1 : 0;
   this->show_stats(0);
 
   if (WIFSIGNALED(status)) {
@@ -281,16 +281,16 @@ void Fuzzer::handle_stop_sig(void) {
 #define UP "\x1b[A"
 #define DOWN "\n"
 void Fuzzer::show_stats(u8 force) {
-  if (!this->render_output) return;
-  u64 duration = (get_cur_time() - this->start_time) / 1000;
-  if (this->total_execs == 1) SAYF(DOWN DOWN DOWN DOWN);
-  if (duration != this->total_time || force) {
+  if (!this->stats.render_output) return;
+  u64 duration = (get_cur_time() - this->stats.start_time) / 1000;
+  if (this->stats.total_execs == 1) SAYF(DOWN DOWN DOWN DOWN);
+  if (duration != this->stats.total_time || force) {
     SAYF(UP UP UP UP);
-    SAYF("  Execs\t: %llu/%llu\n", this->total_ints, this->total_execs);
-    SAYF("  Speed\t: %llu\n", this->total_execs / (duration + 1));
-    SAYF("  Queue\t: %d/%d\n", this->queue_idx, this->queue_size);
-    SAYF("  Stage\t: %s\n", this->stage);
-    this->total_time = duration;
+    SAYF("  Execs\t: %llu/%llu\n", this->stats.total_ints, this->stats.total_execs);
+    SAYF("  Speed\t: %llu\n", this->stats.total_execs / (duration + 1));
+    SAYF("  Queue\t: %d/%d\n", this->stats.queue_idx, this->stats.queue_size);
+    SAYF("  Stage\t: %s\n", this->stats.stage.c_str());
+    this->stats.total_time = duration;
   }
 }
 

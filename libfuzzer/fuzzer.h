@@ -20,6 +20,17 @@ typedef struct {
   u8 hnb;
 } TestCase;
 
+typedef struct {
+  u64 total_execs;
+  u64 total_ints;
+  u64 total_time;
+  u64 start_time;
+  u32 queue_size;
+  u32 queue_idx;
+  bool render_output;
+  string stage = "init";
+} FuzzStats;
+
 class Fuzzer {
   private:
     s32 forksrv_pid,
@@ -47,14 +58,7 @@ class Fuzzer {
     SNeuOptions opt;
 
   public:
-    u64 total_execs;
-    u64 total_ints;
-    u64 total_time;
-    u64 start_time;
-    u32 queue_size;
-    u32 queue_idx;
-    bool render_output;
-    char stage[20] = "init";
+    FuzzStats stats;
     TestCase tc;
     u8 virgin_bits[MAP_SIZE],
        virgin_loss[MAP_SIZE],

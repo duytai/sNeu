@@ -14,7 +14,7 @@ using namespace std::filesystem;
 TestSuite::TestSuite(Fuzzer* fuzzer, SNeuOptions opt) {
   this->fuzzer = fuzzer;
   this->fuzzer->load_opt(opt);
-  this->fuzzer->render_output = true;
+  this->fuzzer->stats.render_output = true;
   this->opt = opt;
 }
 
@@ -76,6 +76,7 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
 
   vector<torch::Tensor> xs, ys;
   vector<TestCase> tcs;
+  auto& stats = this->fuzzer->stats;
   u32 max_len = 0,
       train_epoch = 1000;
 
@@ -103,7 +104,7 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
   torch::optim::SGD optimizer(net->parameters(), /*lr=*/0.01);
 
   /* Training */
-  snprintf(this->fuzzer->stage, 20, "train/%d/%lu", max_len, xs.size());
+  stats.stage = "train";
   this->fuzzer->show_stats(1);
   for (u32 epoch = 0; epoch < train_epoch; epoch += 1) {
     optimizer.zero_grad();
@@ -114,7 +115,7 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
   }
 
   /* Compute grads for input x and mutate topk */
-  snprintf(this->fuzzer->stage, 20, "mutate_topk");
+  stats.stage = "mutate topk";
   this->fuzzer->show_stats(1);
   for (auto x : xs) {
     x = x.clone();
@@ -155,7 +156,7 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
   }
 
   /* Compute grads for input x and muate the whole input */
-  snprintf(this->fuzzer->stage, 20, "mutate_all", num_interests);
+  stats.stage = "mutate all";
   this->fuzzer->show_stats(1);
   for (auto x : xs) {
     x = x.clone();
@@ -187,9 +188,10 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
 
 vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
   vector<TestCase> tcs;
+  auto& stats = this->fuzzer->stats;
 
   /* FLIP1 */
-  snprintf(this->fuzzer->stage, 20, "flip1");
+  stats.stage = "flip1";
   for (u32 i = 0; i < buffer.size() << 3; i += 1) {
     FLIP_BIT(buffer.data(), i);
     this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
@@ -200,7 +202,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
   }
 
   /* FLIP2 */
-  snprintf(this->fuzzer->stage, 20, "flip2");
+  stats.stage = "flip2";
   for (u32 i = 0; i < (buffer.size() << 3) - 1; i += 1) {
     FLIP_BIT(buffer.data(), i);
     FLIP_BIT(buffer.data(), i + 1);
@@ -213,7 +215,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
   }
 
   /* FLIP4 */
-  snprintf(this->fuzzer->stage, 20, "flip4");
+  stats.stage = "flip4";
   for (u32 i = 0; i < (buffer.size() << 3) - 3; i += 1) {
     FLIP_BIT(buffer.data(), i);
     FLIP_BIT(buffer.data(), i + 1);
@@ -241,7 +243,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
   }
 
   /* FLIP8 */
-  snprintf(this->fuzzer->stage, 20, "flip8");
+  stats.stage = "flip8";
   for (u32 i = 0; i < buffer.size(); i += 1) {
     buffer.data()[i] ^= 0xFF;
     this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
@@ -266,7 +268,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
 
   /* FLIP16 */
   if (buffer.size() >= 2) {
-    snprintf(this->fuzzer->stage, 20, "flip16");
+    stats.stage = "flip16";
     for (u32 i = 0; i < buffer.size() - 1; i += 1) {
       if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)]) continue;
       *(u16*)(buffer.data() + i) ^= 0xFFFF;
@@ -280,7 +282,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
 
   /* FLIP32 */
   if (buffer.size() >= 4) {
-    snprintf(this->fuzzer->stage, 20, "flip32");
+    stats.stage = "flip32";
     for (u32 i = 0; i < buffer.size() - 3; i += 1) {
       if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)] &&
           !eff_map[EFF_APOS(i + 2)] && !eff_map[EFF_APOS(i + 3)]) continue;
@@ -294,7 +296,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
   }
 
   /* ARITH8 */
-  snprintf(this->fuzzer->stage, 20, "airth8");
+  stats.stage = "arith8";
   for (u32 i = 0; i < buffer.size(); i += 1) {
     if (!eff_map[EFF_APOS(i)]) continue;
 
@@ -322,7 +324,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
 
   /* ARITH16 */
   if (buffer.size() >= 2) {
-    snprintf(this->fuzzer->stage, 20, "airth16");
+    stats.stage = "arith16";
     for (u32 i = 0; i < buffer.size() - 1; i += 1) {
       if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)]) continue;
       u16 orig = *(u16*)(buffer.data() + i);
@@ -367,7 +369,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
 
   /* ARITH32 */
   if (buffer.size() >= 4) {
-    snprintf(this->fuzzer->stage, 20, "airth32");
+    stats.stage = "arith32";
     for (u32 i = 0; i < buffer.size() - 3; i += 1) {
       if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)] &&
           !eff_map[EFF_APOS(i + 2)] && !eff_map[EFF_APOS(i + 3)]) continue;
@@ -412,7 +414,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
   }
 
   /* INST8 */
-  snprintf(this->fuzzer->stage, 20, "inst8");
+  stats.stage = "inst8";
   for (u32 i = 0; i < buffer.size(); i += 1) {
     if (!eff_map[EFF_APOS(i)]) continue;
     u8 orig = buffer[i];
@@ -432,7 +434,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
 
   /* INST16 */
   if (buffer.size() >= 2) {
-    snprintf(this->fuzzer->stage, 20, "inst16");
+    stats.stage = "inst16";
     for (u32 i = 0; i < buffer.size() - 1; i += 1) {
       if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)]) continue;
       u16 orig = *(u16*)(buffer.data() + i);
@@ -465,7 +467,7 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
 
   /* INST32 */
   if (buffer.size() >= 4) {
-    snprintf(this->fuzzer->stage, 20, "inst32");
+    stats.stage = "inst32";
     for (u32 i = 0; i < buffer.size() - 3; i += 1) {
       if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)] &&
           !eff_map[EFF_APOS(i + 2)] && !eff_map[EFF_APOS(i + 3)]) continue;
@@ -504,16 +506,17 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
 
 void TestSuite::mutate(void) {
 
-  u32 idx = 0;
   auto tcs = this->load_from_dir(this->opt.in_dir);
+  u32 idx = tcs.size();
+  auto& stats = this->fuzzer->stats;
 
   while (1) {
     auto tmp = this->smart_mutate(tcs);
     tcs.insert(tcs.end(), tmp.begin(), tmp.end());
 
     while (idx < tcs.size()) {
-      this->fuzzer->queue_size = tcs.size();
-      this->fuzzer->queue_idx = idx + 1;
+      stats.queue_size = tcs.size();
+      stats.queue_idx = idx + 1;
       this->fuzzer->show_stats(1);
 
       this->fuzzer->run_target(tcs[idx].buffer, EXEC_TIMEOUT);
