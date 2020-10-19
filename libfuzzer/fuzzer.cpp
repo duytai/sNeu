@@ -284,11 +284,11 @@ void Fuzzer::handle_stop_sig(void) {
 void Fuzzer::show_stats(u8 force) {
   auto& stats = this->stats;
   if (!stats.render_output) return;
-  u64 duration = (get_cur_time() - stats.start_time) / 1000;
+  u64 duration = (get_cur_time() - stats.start_time) / 1000 + 60 * 60;
   if (stats.total_execs == 1) SAYF(DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN);
   if (duration != stats.total_time || force) {
     u32 hours = duration / 60 / 60;
-    u32 mins = duration / 60;
+    u32 mins = duration/60 - hours * 60;
     u32 secs = duration - mins * 60 - hours * 60 * 60;
     SAYF(UP UP UP UP UP UP UP UP UP UP UP UP UP);
     SAYF(H10 " Summary " H10 "\n");
