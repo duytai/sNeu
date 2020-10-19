@@ -127,38 +127,35 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
   for (auto x : xs) {
     x = x.clone();
     x.set_requires_grad(true);
-    optimizer.zero_grad();
-    torch::Tensor prediction = net->forward(x);
-    torch::Tensor loss = torch::mse_loss(prediction, torch::zeros(1));
-    loss.backward();
-    auto sign = x.grad().sign();
-    auto topk = x.grad().abs().topk(5);
-    torch::Tensor indices = get<1>(topk);
-    x = x * 255;
-    torch::Tensor inc = torch::zeros(x.sizes()[0]);
-    for (u32 i = 0; i < 5; i += 1) {
-      int idx = indices[i].item<int>();
-      inc[idx] = sign[idx];
-    }
+    for (u32 epoch = 0; epoch < 100; epoch += 1) {
+      optimizer.zero_grad();
+      torch::Tensor prediction = net->forward(x);
+      torch::Tensor loss = torch::mse_loss(prediction, torch::zeros(1));
+      loss.backward();
+      auto topk = x.grad().abs().topk(5);
+      torch::Tensor values = get<0>(topk);
+      torch::Tensor indices = get<1>(topk);
 
-    torch::Tensor x1 = x.clone();
-    for (u32 i = 0; i < 255; i += 1) {
-      x1 = (x1 + inc).clamp(0, 255);
-      vector buffer((char*) x1.data_ptr(), (char*) x1.data_ptr() + x1.numel());
+      /* Compute an update */
+      torch::Tensor extra = torch::zeros(x.sizes()[0]);
+      for (u32 i = 0; i < 5; i += 1) {
+        int idx = indices[i].item<int>();
+        extra[idx] = values[i]; 
+      }
+      x.set_requires_grad(false);
+      x.add_(extra);
+
+      /* Got result, run target */
+      auto temp = x.mul(255.0).to(torch::kUInt8);
+      vector buffer((char*) temp.data_ptr(), (char*) temp.data_ptr() + temp.numel());
       this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
       if (this->fuzzer->tc.hnb) {
         tcs.push_back(this->fuzzer->tc);
       }
-    }
 
-    torch::Tensor x2 = x.clone();
-    for (u32 i = 0; i < 255; i += 1) {
-      x2 = (x2 - inc).clamp(0, 255);
-      vector buffer((char*) x2.data_ptr(), (char*) x2.data_ptr() + x2.numel());
-      this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-      if (this->fuzzer->tc.hnb) {
-        tcs.push_back(this->fuzzer->tc);
-      }
+      /* Zero grad for next round */
+      x.grad().zero_();
+      x.set_requires_grad(true);
     }
   }
 
