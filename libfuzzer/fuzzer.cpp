@@ -297,7 +297,7 @@ void Fuzzer::show_stats(u8 force) {
     SAYF("  Fav        \t: %llu\n", stats.total_ints);
     SAYF("  Speed      \t: %llu\n", stats.total_execs / (duration + 1));
     SAYF("  Queue      \t: %d/%d\n", stats.queue_idx, stats.queue_size);
-    SAYF("  Stage      \t: %s\n", stats.stage.c_str());
+    SAYF("  Stage      \t: %-10s\n", stats.stage.c_str());
     SAYF("  Cycles     \t: %d\n", stats.cycles);
     SAYF(H10 " Network " H10 "\n");
     SAYF("  Branches   \t: %d\n", stats.uncovered_branches);

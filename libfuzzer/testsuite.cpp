@@ -18,7 +18,7 @@ using namespace std::filesystem;
 TestSuite::TestSuite(Fuzzer* fuzzer, SNeuOptions opt) {
   this->fuzzer = fuzzer;
   this->fuzzer->load_opt(opt);
-  this->fuzzer->stats.render_output = false;
+  this->fuzzer->stats.render_output = true;
   this->opt = opt;
 }
 
@@ -87,6 +87,53 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
   u32 max_len = 0,
       train_epoch = 1000;
 
+  /* Splicing */
+  u32 round = 0;
+  if (testcases.size() > 2) {
+    stats.stage = "splicing";
+    while (++ round < 255) {
+      u32 idx_0 = random() % testcases.size();
+      u32 idx_1 = random() % testcases.size();
+      while (idx_0 == idx_1) {
+        idx_1 = random() % testcases.size();
+      }
+      auto& buff_0 = testcases[idx_0].buffer;
+      auto& buff_1 = testcases[idx_1].buffer;
+
+      u32 min_len = min(buff_0.size(), buff_1.size());
+      s32 f_loc = -1, l_loc = -1;
+      for (u32 i = 0; i < min_len; i += 1) {
+        if (buff_0[i] != buff_1[i]) {
+          if (f_loc == -1) f_loc = i;
+          l_loc = i;
+        }
+      }
+      if (f_loc < 2 || l_loc < 2 || f_loc == l_loc) continue;
+
+      /* Choose place to split */
+      u32 split_at = f_loc + random() % (l_loc - f_loc + 1);
+
+      /* head + tail of child 0 */
+      vector<char> child_0(buff_1.size());
+      memcpy(child_0.data(), buff_0.data(), split_at); 
+      memcpy(child_0.data() + split_at, buff_1.data() + split_at, buff_1.size() - split_at); 
+
+      /* head + tail of child 1 */
+      vector<char> child_1(buff_0.size());
+      memcpy(child_1.data(), buff_1.data(), split_at);
+      memcpy(child_1.data() + split_at, buff_0.data() + split_at, buff_0.size() - split_at);
+
+      /* run target and save if interest */
+      for (auto buffer : {child_0, child_1}) {
+        this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+        if (this->fuzzer->tc.hnb) {
+          tcs.push_back(this->fuzzer->tc);
+          this->write_testcase(buffer);
+        }
+      }
+    }
+  }
+
   /* Compute labels */
   this->compute_branch_loss(testcases);
   for (auto t : testcases) {
@@ -96,7 +143,6 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
   }
   stats.input_size = max_len;
 
-  /* Splicing */
 
   for (auto t : testcases) {
     if (t.min_loss != 255) {
