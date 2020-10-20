@@ -115,8 +115,8 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
 
       /* head + tail of child 0 */
       vector<char> child_0(buff_1.size());
-      memcpy(child_0.data(), buff_0.data(), split_at); 
-      memcpy(child_0.data() + split_at, buff_1.data() + split_at, buff_1.size() - split_at); 
+      memcpy(child_0.data(), buff_0.data(), split_at);
+      memcpy(child_0.data() + split_at, buff_1.data() + split_at, buff_1.size() - split_at);
 
       /* head + tail of child 1 */
       vector<char> child_1(buff_0.size());
@@ -176,7 +176,7 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
   /* Compute grads for input x and mutate topk */
   stats.stage = "mtopk";
   this->fuzzer->show_stats(1);
-  for (auto& x : xs) {
+  for (auto x : xs) {
     x = x.clone();
     x.set_requires_grad(true);
     for (u32 epoch = 0; epoch < 100; epoch += 1) {
@@ -215,7 +215,7 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
   /* Compute grads for input x and muate the whole input */
   stats.stage = "mall";
   this->fuzzer->show_stats(1);
-  for (auto& x : xs) {
+  for (auto x : xs) {
     x = x.clone();
     x.set_requires_grad(true);
     for (u32 epoch = 0; epoch < 100; epoch += 1) {
