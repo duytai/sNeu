@@ -143,7 +143,6 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
   }
   stats.input_size = max_len;
 
-
   for (auto t : testcases) {
     if (t.min_loss != 255) {
       torch::Tensor x = torch::zeros(max_len);
@@ -610,6 +609,7 @@ void TestSuite::mutate(void) {
 
   stats.test_idx = tcs.size();
 
+  this->fuzzer->show_stats(1);
   while (1) {
     auto tmp = this->smart_mutate(tcs);
     tcs.insert(tcs.end(), tmp.begin(), tmp.end());

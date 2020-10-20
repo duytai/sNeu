@@ -207,7 +207,7 @@ static u64 get_cur_time(void) {
 
 }
 
-static char* hexify(char* mem, u32 len) {
+static void hexify(char* mem, u32 len) {
   char literal[] = "0123456789abcdef";
   char data[len * 2 + 1];
   for (u32 i = 0; i < len; i += 1) {
@@ -215,7 +215,7 @@ static char* hexify(char* mem, u32 len) {
     data[i*2 + 1] = literal[(u8) (mem[i] & 0x0F)];
 	}
   data[len * 2] = '\0';
-  return data;
+  printf("hex: %s\n", data);
 }
 
 #define FLIP_BIT(_ar, _b) do { \
