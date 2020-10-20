@@ -18,7 +18,7 @@ using namespace std::filesystem;
 TestSuite::TestSuite(Fuzzer* fuzzer, SNeuOptions opt) {
   this->fuzzer = fuzzer;
   this->fuzzer->load_opt(opt);
-  this->fuzzer->stats.render_output = true;
+  this->fuzzer->stats.render_output = false;
   this->opt = opt;
 }
 
@@ -87,6 +87,7 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
   u32 max_len = 0,
       train_epoch = 1000;
 
+  /* Compute labels */
   this->compute_branch_loss(testcases);
   for (auto t : testcases) {
     if (t.min_loss != 255) {
@@ -94,6 +95,8 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
     }
   }
   stats.input_size = max_len;
+
+  /* Splicing */
 
   for (auto t : testcases) {
     if (t.min_loss != 255) {
@@ -128,7 +131,7 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
   /* Compute grads for input x and mutate topk */
   stats.stage = "mtopk";
   this->fuzzer->show_stats(1);
-  for (auto x : xs) {
+  for (auto& x : xs) {
     x = x.clone();
     x.set_requires_grad(true);
     for (u32 epoch = 0; epoch < 100; epoch += 1) {
@@ -143,7 +146,7 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
       /* Compute an update */
       torch::Tensor extra = torch::zeros(x.sizes()[0]);
       for (u32 i = 0; i < 5; i += 1) {
-        int idx = indices[i].item<int>();
+        auto idx = indices[i].item<int>();
         extra[idx] = values[i]; 
       }
       x.set_requires_grad(false);
@@ -167,7 +170,7 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
   /* Compute grads for input x and muate the whole input */
   stats.stage = "mall";
   this->fuzzer->show_stats(1);
-  for (auto x : xs) {
+  for (auto& x : xs) {
     x = x.clone();
     x.set_requires_grad(true);
     for (u32 epoch = 0; epoch < 100; epoch += 1) {
@@ -546,6 +549,7 @@ void TestSuite::write_testcase(vector<char>& mem) {
 
   // TODO: mall, mtopk dont have src:000000
   string fname = out_dir + "/id:" + idx_str + ",src:" + src_str + ",op:" + stats.stage;
+  unlink(fname.c_str());
   auto fd = open(fname.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600);
   if (fd < 0) PFATAL("Unable to create '%s'", fname.c_str());
   write(fd, mem.data(), mem.size());
