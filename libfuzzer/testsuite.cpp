@@ -46,15 +46,7 @@ void TestSuite::compute_branch_loss(vector<TestCase>& testcases) {
 
   for (; i < MAP_SIZE; i += 1) {
     if (this->fuzzer->virgin_loss[i] != 0 && this->fuzzer->virgin_loss[i] != 255) {
-      set<u8> losses;
-      for (auto t: testcases) {
-        losses.insert(t.loss_bits[i]);
-      }
-      /*
-       * Value in branch $i changed twice
-       * TODO: increase to reduce the number of uncover branches in dataset
-       * */
-      if (losses.size() >= 2) inst_branches.push_back(i);
+      inst_branches.push_back(i);
     }
   }
 
@@ -90,24 +82,21 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
   /* Compute labels */
   this->compute_branch_loss(testcases);
   for (auto t : testcases) {
-    if (t.min_loss != 255) {
-      max_len = max((u32) t.buffer.size(), max_len);
-    }
+    max_len = max((u32) t.buffer.size(), max_len);
   }
-  stats.input_size = max_len;
+  if (!max_len) return tcs; 
 
+  stats.input_size = max_len;
   for (auto t : testcases) {
-    if (t.min_loss != 255) {
-      torch::Tensor x = torch::zeros(max_len);
-      torch::Tensor y = torch::zeros(1);
-      for (size_t i = 0; i < t.buffer.size(); i += 1) {
-        x[i] = (u8) t.buffer[i] / 255.0;
-      }
-      y[0] = t.min_loss / 64.0;
-      xs.push_back(x);
-      ys.push_back(y);
-      losses.insert(t.min_loss);
+    torch::Tensor x = torch::zeros(max_len);
+    torch::Tensor y = torch::zeros(1);
+    for (size_t i = 0; i < t.buffer.size(); i += 1) {
+      x[i] = (u8) t.buffer[i] / 255.0;
     }
+    y[0] = t.min_loss / 64.0;
+    xs.push_back(x);
+    ys.push_back(y);
+    losses.insert(t.min_loss);
   }
   stats.total_inputs = ys.size();
   stats.uniq_loss = losses.size();
