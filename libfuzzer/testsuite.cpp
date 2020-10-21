@@ -81,58 +81,11 @@ void TestSuite::compute_branch_loss(vector<TestCase>& testcases) {
 vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
 
   set<u8> losses;
-  vector<torch::Tensor> xs, ys;
+  vector<torch::Tensor> xs, ys, mixed_xs;
   vector<TestCase> tcs;
   auto& stats = this->fuzzer->stats;
   u32 max_len = 0,
       train_epoch = 1000;
-
-  /* Splicing */
-  u32 round = 0;
-  if (testcases.size() > 2) {
-    stats.stage = "splicing";
-    while (++ round < 255) {
-      u32 idx_0 = random() % testcases.size();
-      u32 idx_1 = random() % testcases.size();
-      while (idx_0 == idx_1) {
-        idx_1 = random() % testcases.size();
-      }
-      auto& buff_0 = testcases[idx_0].buffer;
-      auto& buff_1 = testcases[idx_1].buffer;
-
-      u32 min_len = min(buff_0.size(), buff_1.size());
-      s32 f_loc = -1, l_loc = -1;
-      for (u32 i = 0; i < min_len; i += 1) {
-        if (buff_0[i] != buff_1[i]) {
-          if (f_loc == -1) f_loc = i;
-          l_loc = i;
-        }
-      }
-      if (f_loc < 2 || l_loc < 2 || f_loc == l_loc) continue;
-
-      /* Choose place to split */
-      u32 split_at = f_loc + random() % (l_loc - f_loc + 1);
-
-      /* head + tail of child 0 */
-      vector<char> child_0(buff_1.size());
-      memcpy(child_0.data(), buff_0.data(), split_at);
-      memcpy(child_0.data() + split_at, buff_1.data() + split_at, buff_1.size() - split_at);
-
-      /* head + tail of child 1 */
-      vector<char> child_1(buff_0.size());
-      memcpy(child_1.data(), buff_1.data(), split_at);
-      memcpy(child_1.data() + split_at, buff_0.data() + split_at, buff_0.size() - split_at);
-
-      /* run target and save if interest */
-      for (auto buffer : {child_0, child_1}) {
-        this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-        if (this->fuzzer->tc.hnb) {
-          tcs.push_back(this->fuzzer->tc);
-          this->write_testcase(buffer);
-        }
-      }
-    }
-  }
 
   /* Compute labels */
   this->compute_branch_loss(testcases);
@@ -172,6 +125,71 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
     loss.backward();
     optimizer.step();
   }
+
+  /* Add and Delete */
+  if (testcases.size() > 2) {
+    for (u32 i = 0; i < testcases.size(); i += 1) {
+      auto buff = testcases[i].buffer;
+      u32 half_size = buff.size() / 2;
+      if (half_size > 0) {
+        u32 delete_from = half_size + random() % half_size;
+        auto off = torch::zeros(max_len);
+        for (u32 j = 0; j < delete_from; j += 1) {
+          off[j] = (u8) buff[j] / 255.0;
+        }
+        mixed_xs.push_back(off);
+      }
+    }
+  }
+
+  /* Splicing */
+  if (testcases.size() > 2) {
+    for (u32 i = 0; i < testcases.size(); i += 1) {
+      u32 j = random() % testcases.size();
+      while (j == i) {
+        j = random() % testcases.size();
+      }
+      auto buff_0 = testcases[i].buffer; 
+      auto buff_1 = testcases[j].buffer;
+      auto min_len = min(buff_0.size(), buff_1.size());
+      s32 f_diff = -1, l_diff = -1;
+      for (u32 loc = 0; loc < min_len; loc += 1) {
+        if (buff_0[loc] != buff_1[loc]) {
+          if (f_diff == -1) f_diff = loc;
+          l_diff = loc;
+        }
+      }
+      if (f_diff < 0 || l_diff < 2 || f_diff == l_diff) continue;
+      u32 split_at = f_diff + random() % (l_diff - f_diff + 1);
+
+      torch::Tensor off_0 = torch::zeros(max_len);
+      torch::Tensor off_1 = torch::zeros(max_len);
+
+      for (u32 i = 0; i < max_len; i += 1) {
+        /* Create first offspring */
+        if (i < buff_1.size()) {
+          if (i < split_at) {
+            off_0[i] = (u8) buff_0[i] / 255.0;
+          } else {
+            off_0[i] = (u8) buff_1[i] / 255.0;
+          }
+        }
+        /* Create second offspring */
+        if (i < buff_0.size()) {
+          if (i < split_at) {
+            off_1[i] = (u8) buff_1[i] / 255.0;
+          } else {
+            off_1[i] = (u8) buff_0[i] / 255.0;
+          }
+        }
+      }
+
+      mixed_xs.push_back(off_0);
+      mixed_xs.push_back(off_1);
+    }
+  }
+  /* Append mixed_xs to xs */
+  xs.insert(xs.end(), mixed_xs.begin(), mixed_xs.end());
 
   /* Compute grads for input x and mutate topk */
   stats.stage = "mtopk";
