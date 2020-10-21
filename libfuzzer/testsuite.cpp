@@ -3,17 +3,16 @@
 #include <libfuzzer/fuzzer.h>
 #include <libfuzzer/net.h>
 #include <libfuzzer/util.h>
-#include <filesystem>
 #include <algorithm>
 #include <fstream>
 #include <set>
 #include <unistd.h>
 #include <fcntl.h>
+#include <dirent.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
 using namespace std;
-using namespace std::filesystem;
 
 TestSuite::TestSuite(Fuzzer* fuzzer, SNeuOptions opt) {
   this->fuzzer = fuzzer;
@@ -24,16 +23,32 @@ TestSuite::TestSuite(Fuzzer* fuzzer, SNeuOptions opt) {
 
 vector<TestCase> TestSuite::load_from_dir(char* dir) {
   vector<TestCase> tcs;
-  vector<directory_entry> files((directory_iterator(dir)), directory_iterator());
-  sort(files.begin(), files.end());
+  struct dirent **nl;
 
-  for (auto &file: files) {
-    if (file.is_regular_file() && file.file_size() > 0) {
-      ifstream st(file.path(), ios::binary);
-      vector<char> buffer((istreambuf_iterator<char>(st)), istreambuf_iterator<char>());
-      this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-      tcs.push_back(this->fuzzer->tc);
-    }
+  s32 nl_cnt = scandir(dir, &nl, NULL, alphasort);
+  if (nl_cnt < 0) PFATAL("Unable to open '%s'", dir);
+
+  for (auto i = 0; i < nl_cnt; i += 1) {
+
+    struct stat st;
+    auto fn = string(dir) + "/" + string(nl[i]->d_name);
+
+    free(nl[i]);
+    if (lstat(fn.c_str(), &st) || access(fn.c_str(), R_OK)) PFATAL("Unable to access '%s'", fn.c_str());
+    if (!S_ISREG(st.st_mode) || !st.st_size || strstr(fn.c_str(), "/README.txt")) continue;
+
+    s32 fd = open(fn.c_str(), O_RDONLY);
+    if (fd < 0) PFATAL("Unable to open '%s'", fn.c_str());
+
+    char use_mem[st.st_size];
+    if (read(fd, use_mem, st.st_size) != st.st_size) FATAL("Short read from '%s'", fn.c_str());
+
+    vector<char> buffer(use_mem, use_mem + st.st_size);
+    this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+    if (!this->fuzzer->tc.hnb) PFATAL("Useless '%s'", fn.c_str());
+    tcs.push_back(this->fuzzer->tc);
+
+    close(fd);
   }
 
   return tcs;
