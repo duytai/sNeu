@@ -51,6 +51,8 @@ vector<TestCase> TestSuite::load_from_dir(char* dir) {
     close(fd);
   }
 
+  free(nl);
+
   return tcs;
 }
 
