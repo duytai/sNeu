@@ -45,7 +45,7 @@ vector<TestCase> TestSuite::load_from_dir(char* dir) {
 
     vector<char> buffer(use_mem, use_mem + st.st_size);
     this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-    if (!this->fuzzer->tc.hnb) PFATAL("Useless '%s'", fn.c_str());
+    if (!this->fuzzer->tc.hnb) WARNF("Useless '%s'", fn.c_str());
     tcs.push_back(this->fuzzer->tc);
 
     close(fd);
