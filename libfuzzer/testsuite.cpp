@@ -93,7 +93,7 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
   vector<TestCase> tcs;
   auto& stats = this->fuzzer->stats;
   u32 max_len = 0,
-      train_epoch = 1000;
+      train_epoch = 100;
 
   /* Compute labels */
   this->compute_branch_loss(testcases);
@@ -102,14 +102,14 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
   }
   if (!max_len) return tcs; 
 
+  auto options = torch::TensorOptions().dtype(torch::kUInt8);
   stats.input_size = max_len;
   for (auto t : testcases) {
     torch::Tensor x = torch::zeros(max_len);
     torch::Tensor y = torch::zeros(1);
-    for (size_t i = 0; i < t.buffer.size(); i += 1) {
-      x[i] = (u8) t.buffer[i] / 255.0;
-    }
-    y[0] = t.min_loss / 64.0;
+    x.slice(0, 0, t.buffer.size()) = torch::from_blob(t.buffer.data(), t.buffer.size(), options);
+    x = x / 255.0;
+    y[0] = t.min_loss / 255.0;
     xs.push_back(x);
     ys.push_back(y);
     losses.insert(t.min_loss);
