@@ -32,7 +32,8 @@ class TestSuite {
     vector<TestCase> load_from_dir(char* dir);
     vector<TestCase> smart_mutate(vector<TestCase>&);
     vector<TestCase> deterministic(vector<char>, u32);
-    void write_testcase(vector<char>&);
+    void save_if_interest(u8 ret,vector<char>&, vector<TestCase>& tcs);
+    void write_testcase(string, vector<char>&);
     void mutate(void);
 };
 

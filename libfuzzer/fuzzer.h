@@ -13,15 +13,24 @@
 
 using namespace std;
 
+enum {
+  /* 00 */ FAULT_NONE,
+  /* 01 */ FAULT_TMOUT,
+  /* 02 */ FAULT_CRASH,
+  /* 03 */ FAULT_ERROR,
+  /* 04 */ FAULT_NOINST,
+  /* 05 */ FAULT_NOBITS
+};
+
+
 typedef struct {
   vector<char> buffer;
   vector<u8> loss_bits;
   u8 min_loss = 255;
-  u8 hnb;
 } TestCase;
 
 typedef struct {
-  string stage = "init";
+  string stage = "import";
   bool render_output;
   u64 total_execs;
   u64 total_ints;
@@ -30,11 +39,14 @@ typedef struct {
   u32 queue_size;
   u32 queue_idx;
   u32 cycles;
+  u32 queued_with_cov;
   /* nural network */
   u32 uncovered_branches;
   u32 input_size;
   u32 total_inputs;
   u32 uniq_loss;
+  u32 total_crashes;
+  u32 uniq_crashes;
   /* test cases */
   u32 test_idx;
 } FuzzStats;
@@ -70,6 +82,7 @@ class Fuzzer {
     TestCase tc;
     u8 virgin_bits[MAP_SIZE],
        virgin_loss[MAP_SIZE],
+       virgin_crash[MAP_SIZE],
        * loss_bits,
        * trace_bits;
 
@@ -86,7 +99,7 @@ class Fuzzer {
     void update_loss(void);
     void handle_stop_sig(void);
     void show_stats(u8 force); 
-    u8 has_new_bits(void);
+    u8 has_new_bits(u8* virgin_map);
     u8 run_target(vector<char>& mem, u32 exec_tmout);
 };
 

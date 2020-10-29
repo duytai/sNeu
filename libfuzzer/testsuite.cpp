@@ -44,8 +44,8 @@ vector<TestCase> TestSuite::load_from_dir(char* dir) {
     if (read(fd, use_mem, st.st_size) != st.st_size) FATAL("Short read from '%s'", fn.c_str());
 
     vector<char> buffer(use_mem, use_mem + st.st_size);
-    this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-    tcs.push_back(this->fuzzer->tc);
+    auto tmp = this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+    this->save_if_interest(tmp, buffer, tcs);
 
     close(fd);
   }
@@ -223,11 +223,8 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
       /* Got result, run target */
       auto temp = x.mul(255.0).to(torch::kUInt8);
       vector buffer((char*) temp.data_ptr(), (char*) temp.data_ptr() + temp.numel());
-      this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-      if (this->fuzzer->tc.hnb) {
-        tcs.push_back(this->fuzzer->tc);
-        this->write_testcase(buffer);
-      }
+      auto tmp = this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+      this->save_if_interest(tmp, buffer, tcs);
 
       /* Zero grad for next round */
       x.grad().zero_();
@@ -252,11 +249,8 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
       /* Got result, run target */
       auto temp = x.mul(255.0).to(torch::kUInt8);
       vector buffer((char*) temp.data_ptr(), (char*) temp.data_ptr() + temp.numel());
-      this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-      if (this->fuzzer->tc.hnb) {
-        tcs.push_back(this->fuzzer->tc);
-        this->write_testcase(buffer);
-      }
+      auto tmp = this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+      this->save_if_interest(tmp, buffer, tcs);
 
       /* Zero grad for next round */
       x.grad().zero_();
@@ -275,11 +269,8 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
   stats.stage = "flip1";
   for (u32 i = 0; i < buffer.size() << 3; i += 1) {
     FLIP_BIT(buffer.data(), i);
-    this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-    if (this->fuzzer->tc.hnb) {
-      tcs.push_back(this->fuzzer->tc);
-      this->write_testcase(buffer);
-    }
+    auto tmp = this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+    this->save_if_interest(tmp, buffer, tcs);
     FLIP_BIT(buffer.data(), i);
   }
 
@@ -288,11 +279,8 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
   for (u32 i = 0; i < (buffer.size() << 3) - 1; i += 1) {
     FLIP_BIT(buffer.data(), i);
     FLIP_BIT(buffer.data(), i + 1);
-    this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-    if (this->fuzzer->tc.hnb) {
-      tcs.push_back(this->fuzzer->tc);
-      this->write_testcase(buffer);
-    }
+    auto tmp = this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+    this->save_if_interest(tmp, buffer, tcs);
     FLIP_BIT(buffer.data(), i);
     FLIP_BIT(buffer.data(), i + 1);
   }
@@ -304,11 +292,8 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
     FLIP_BIT(buffer.data(), i + 1);
     FLIP_BIT(buffer.data(), i + 2);
     FLIP_BIT(buffer.data(), i + 3);
-    this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-    if (this->fuzzer->tc.hnb) {
-      tcs.push_back(this->fuzzer->tc);
-      this->write_testcase(buffer);
-    }
+    auto tmp = this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+    this->save_if_interest(tmp, buffer, tcs);
     FLIP_BIT(buffer.data(), i);
     FLIP_BIT(buffer.data(), i + 1);
     FLIP_BIT(buffer.data(), i + 2);
@@ -330,11 +315,8 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
   stats.stage = "flip8";
   for (u32 i = 0; i < buffer.size(); i += 1) {
     buffer.data()[i] ^= 0xFF;
-    this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-    if (this->fuzzer->tc.hnb) {
-      tcs.push_back(this->fuzzer->tc);
-      this->write_testcase(buffer);
-    }
+    auto tmp = this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+    this->save_if_interest(tmp, buffer, tcs);
 
     if (!eff_map[EFF_APOS(i)]) {
       u32 new_cksum = hash32(this->fuzzer->trace_bits, MAP_SIZE, HASH_CONST);
@@ -357,11 +339,8 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
     for (u32 i = 0; i < buffer.size() - 1; i += 1) {
       if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)]) continue;
       *(u16*)(buffer.data() + i) ^= 0xFFFF;
-      this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-      if (this->fuzzer->tc.hnb) {
-        tcs.push_back(this->fuzzer->tc);
-        this->write_testcase(buffer);
-      }
+      auto tmp = this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+      this->save_if_interest(tmp, buffer, tcs);
       *(u16*)(buffer.data() + i) ^= 0xFFFF;
     }
   }
@@ -373,11 +352,8 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
       if (!eff_map[EFF_APOS(i)] && !eff_map[EFF_APOS(i + 1)] &&
           !eff_map[EFF_APOS(i + 2)] && !eff_map[EFF_APOS(i + 3)]) continue;
       *(u32*)(buffer.data() + i) ^= 0xFFFFFFFF;
-      this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-      if (this->fuzzer->tc.hnb) {
-        tcs.push_back(this->fuzzer->tc);
-        this->write_testcase(buffer);
-      }
+      auto tmp = this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+      this->save_if_interest(tmp, buffer, tcs);
       *(u32*)(buffer.data() + i) ^= 0xFFFFFFFF;
     }
   }
@@ -393,19 +369,13 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
       u8 r2 = orig ^ (orig - j);
       if (!could_be_bitflip(r1)) {
         buffer[i] = orig + j;
-        this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-        if (this->fuzzer->tc.hnb) {
-          tcs.push_back(this->fuzzer->tc);
-          this->write_testcase(buffer);
-        }
+        auto tmp = this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+        this->save_if_interest(tmp, buffer, tcs);
       }
       if (!could_be_bitflip(r2)) {
         buffer[i] = orig - j;
-        this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-        if (this->fuzzer->tc.hnb) {
-          tcs.push_back(this->fuzzer->tc);
-          this->write_testcase(buffer);
-        }
+        auto tmp = this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+        this->save_if_interest(tmp, buffer, tcs);
       }
       buffer[i] = orig;
     }
@@ -425,35 +395,23 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
 
         if ((orig & 0xff) + j > 0xff && !could_be_bitflip(r1)) {
           *(u16*)(buffer.data() + i) = orig + j;
-          this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-          if (this->fuzzer->tc.hnb) {
-            tcs.push_back(this->fuzzer->tc);
-            this->write_testcase(buffer);
-          }
+          auto tmp = this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+          this->save_if_interest(tmp, buffer, tcs);
         }
         if ((orig & 0xff) < j && !could_be_bitflip(r2)) {
           *(u16*)(buffer.data() + i) = orig - j;
-          this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-          if (this->fuzzer->tc.hnb) {
-            tcs.push_back(this->fuzzer->tc);
-            this->write_testcase(buffer);
-          }
+          auto tmp = this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+          this->save_if_interest(tmp, buffer, tcs);
         }
         if ((orig >> 8) + j > 0xff && !could_be_bitflip(r3)) {
           *(u16*)(buffer.data() + i) = SWAP16(SWAP16(orig) + j);
-          this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-          if (this->fuzzer->tc.hnb) {
-            tcs.push_back(this->fuzzer->tc);
-            this->write_testcase(buffer);
-          }
+          auto tmp = this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+          this->save_if_interest(tmp, buffer, tcs);
         }
         if ((orig >> 8) < j && !could_be_bitflip(r4)) {
           *(u16*)(buffer.data() + i) = SWAP16(SWAP16(orig) - j);
-          this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-          if (this->fuzzer->tc.hnb) {
-            tcs.push_back(this->fuzzer->tc);
-            this->write_testcase(buffer);
-          }
+          auto tmp = this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+          this->save_if_interest(tmp, buffer, tcs);
         }
         *(u16*)(buffer.data() + i) = orig;
       }
@@ -475,35 +433,23 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
 
         if ((orig & 0xffff) + j > 0xffff && !could_be_bitflip(r1)) {
           *(u32*)(buffer.data() + i) = orig + j;
-          this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-          if (this->fuzzer->tc.hnb) {
-            tcs.push_back(this->fuzzer->tc);
-            this->write_testcase(buffer);
-          }
+          auto tmp = this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+          this->save_if_interest(tmp, buffer, tcs);
         }
         if ((orig & 0xffff) < j && !could_be_bitflip(r2)) {
           *(u32*)(buffer.data() + i) = orig - j;
-          this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-          if (this->fuzzer->tc.hnb) {
-            tcs.push_back(this->fuzzer->tc);
-            this->write_testcase(buffer);
-          }
+          auto tmp = this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+          this->save_if_interest(tmp, buffer, tcs);
         }
         if ((SWAP32(orig) & 0xffff) + j > 0xffff && !could_be_bitflip(r3)) {
           *(u32*)(buffer.data() + i) = SWAP32(SWAP32(orig) + j);
-          this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-          if (this->fuzzer->tc.hnb) {
-            tcs.push_back(this->fuzzer->tc);
-            this->write_testcase(buffer);
-          }
+          auto tmp = this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+          this->save_if_interest(tmp, buffer, tcs);
         }
         if ((SWAP32(orig) & 0xffff) < j && !could_be_bitflip(r4)) {
           *(u32*)(buffer.data() + i) = SWAP32(SWAP32(orig) - j);
-          this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-          if (this->fuzzer->tc.hnb) {
-            tcs.push_back(this->fuzzer->tc);
-            this->write_testcase(buffer);
-          }
+          auto tmp = this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+          this->save_if_interest(tmp, buffer, tcs);
         }
         *(u32*)(buffer.data() + i) = orig;
       }
@@ -521,11 +467,8 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
         continue;
       }
       buffer[i] = interesting_8[j];
-      this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-      if (this->fuzzer->tc.hnb) {
-        tcs.push_back(this->fuzzer->tc);
-        this->write_testcase(buffer);
-      }
+      auto tmp = this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+      this->save_if_interest(tmp, buffer, tcs);
       buffer[i] = orig;
     }
   }
@@ -542,22 +485,16 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
             !could_be_arith(orig, (u16)interesting_16[j], 2) &&
             !could_be_interest(orig, (u16)interesting_16[j], 2, 0)) {
           *(u16*)(buffer.data() + i) = interesting_16[j];
-          this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-          if (this->fuzzer->tc.hnb) {
-            tcs.push_back(this->fuzzer->tc);
-            this->write_testcase(buffer);
-          }
+          auto tmp = this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+          this->save_if_interest(tmp, buffer, tcs);
         }
         if ((u16)interesting_16[j] != SWAP16(interesting_16[j]) &&
             !could_be_bitflip(orig ^ SWAP16(interesting_16[j])) &&
             !could_be_arith(orig, SWAP16(interesting_16[j]), 2) &&
             !could_be_interest(orig, SWAP16(interesting_16[j]), 2, 1)) {
           *(u16*)(buffer.data() + i) = SWAP16(interesting_16[j]);
-          this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-          if (this->fuzzer->tc.hnb) {
-            tcs.push_back(this->fuzzer->tc);
-            this->write_testcase(buffer);
-          }
+          auto tmp = this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+          this->save_if_interest(tmp, buffer, tcs);
         }
       }
 
@@ -579,11 +516,8 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
             !could_be_arith(orig, interesting_32[j], 4) &&
             !could_be_interest(orig, interesting_32[j], 4, 0)) {
           *(u32*)(buffer.data()+ i) = interesting_32[j];
-          this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-          if (this->fuzzer->tc.hnb) {
-            tcs.push_back(this->fuzzer->tc);
-            this->write_testcase(buffer);
-          }
+          auto tmp = this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+          this->save_if_interest(tmp, buffer, tcs);
         } 
 
         if ((u32)interesting_32[j] != SWAP32(interesting_32[j]) &&
@@ -591,11 +525,8 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
             !could_be_arith(orig, SWAP32(interesting_32[j]), 4) &&
             !could_be_interest(orig, SWAP32(interesting_32[j]), 4, 1)) {
           *(u32*)(buffer.data() + i) = SWAP32(interesting_32[j]);
-          this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
-          if (this->fuzzer->tc.hnb) {
-            tcs.push_back(this->fuzzer->tc);
-            this->write_testcase(buffer);
-          }
+          auto tmp = this->fuzzer->run_target(buffer, EXEC_TIMEOUT);
+          this->save_if_interest(tmp, buffer, tcs);
         }
       }
 
@@ -606,7 +537,27 @@ vector<TestCase> TestSuite::deterministic(vector<char> buffer, u32 cksum) {
   return tcs;
 }
 
-void TestSuite::write_testcase(vector<char>& mem) {
+void TestSuite::save_if_interest(u8 result, vector<char>& mem, vector<TestCase>& tcs) {
+  auto& stats = this->fuzzer->stats;
+  u8 hnb = this->fuzzer->has_new_bits(this->fuzzer->virgin_bits);
+  u8 crash_hnb = (result == FAULT_CRASH) ? this->fuzzer->has_new_bits(this->fuzzer->virgin_crash) : 0;
+  string status = "success:" + to_string(hnb) + ",crash:" + to_string(crash_hnb);
+
+  stats.total_crashes += (result == FAULT_CRASH);
+  stats.uniq_crashes += crash_hnb > 0;
+
+  if (hnb || crash_hnb) {
+    tcs.push_back(this->fuzzer->tc);
+    this->write_testcase(status, mem);
+    if (hnb) {
+      this->fuzzer->stats.queued_with_cov += (hnb == 2 ? 1 : 0);
+      stats.total_ints += 1;
+    }
+  }
+}
+
+// TODO: mall, mtopk dont have src:000000
+void TestSuite::write_testcase(string status, vector<char>& mem) {
   auto& stats = this->fuzzer->stats;
   string out_dir = string(this->opt.out_dir);
 
@@ -615,8 +566,7 @@ void TestSuite::write_testcase(vector<char>& mem) {
   snprintf(idx_str, 7, "%06d", stats.test_idx);
   snprintf(src_str, 7, "%06d", stats.queue_idx);
 
-  // TODO: mall, mtopk dont have src:000000
-  string fname = out_dir + "/id:" + idx_str + ",src:" + src_str + ",op:" + stats.stage;
+  string fname = out_dir + "/id:" + idx_str + ",src:" + src_str + ",op:" + stats.stage + "," + status;
   unlink(fname.c_str());
   auto fd = open(fname.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600);
   if (fd < 0) PFATAL("Unable to create '%s'", fname.c_str());

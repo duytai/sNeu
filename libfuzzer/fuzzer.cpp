@@ -16,17 +16,6 @@
 #include <libfuzzer/fuzzer.h>
 #include <libfuzzer/util.h>
 
-/* X86 only */
-
-enum {
-  /* 00 */ FAULT_NONE,
-  /* 01 */ FAULT_TMOUT,
-  /* 02 */ FAULT_CRASH,
-  /* 03 */ FAULT_ERROR,
-  /* 04 */ FAULT_NOINST,
-  /* 05 */ FAULT_NOBITS
-};
-
 Fuzzer::Fuzzer(void) {
   this->init_count_class16();
   this->setup_fds();
@@ -88,6 +77,7 @@ void Fuzzer::setup_shm(void) {
   setenv(SHM_ENV_VAR, std::to_string(shm_id).c_str(), 1);
   memset(this->virgin_bits, 255, MAP_SIZE);
   memset(this->virgin_loss, 255, MAP_SIZE);
+  memset(this->virgin_crash, 255, MAP_SIZE);
 
   void* trace_bits = shmat(shm_id, NULL, 0);
   if (trace_bits == (void *)-1) PFATAL("shmat() failed");
@@ -217,8 +207,7 @@ u8 Fuzzer::run_target(vector<char>& mem, u32 timeout) {
   this->update_loss();
 
   vector<u8> loss_bits(this->loss_bits, this->loss_bits + MAP_SIZE);
-  this->tc = { .buffer = mem, .loss_bits = loss_bits, .hnb = this->has_new_bits() };
-  this->stats.total_ints += this->tc.hnb > 0 ? 1 : 0;
+  this->tc = { .buffer = mem, .loss_bits = loss_bits };
   this->show_stats(0);
 
   if (WIFSIGNALED(status)) {
@@ -230,9 +219,9 @@ u8 Fuzzer::run_target(vector<char>& mem, u32 timeout) {
   return FAULT_NONE;
 }
 
-u8 Fuzzer::has_new_bits(void) {
+u8 Fuzzer::has_new_bits(u8* virgin_map) {
   u64* current = (u64*) this->trace_bits;
-  u64* virgin  = (u64*) this->virgin_bits;
+  u64* virgin  = (u64*) virgin_map;
   u32 i = (MAP_SIZE >> 3);
   u8 ret = 0;
 
@@ -285,12 +274,12 @@ void Fuzzer::show_stats(u8 force) {
   auto& stats = this->stats;
   if (!stats.render_output) return;
   u64 duration = (get_cur_time() - stats.start_time) / 1000;
-  if (stats.total_execs == 1) SAYF(DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN);
+  if (stats.total_execs == 1) SAYF(DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN);
   if (duration != stats.total_time || force) {
     u32 hours = duration / 60 / 60;
     u32 mins = duration/60 - hours * 60;
     u32 secs = duration - mins * 60 - hours * 60 * 60;
-    SAYF(UP UP UP UP UP UP UP UP UP UP UP UP UP);
+    SAYF(UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP UP);
     SAYF(H10 " Summary " H10 "\n");
     SAYF("  Time       \t: %02d:%02d:%02d\n", hours, mins, secs);
     SAYF("  Execs      \t: %llu\n", stats.total_execs);
@@ -299,6 +288,9 @@ void Fuzzer::show_stats(u8 force) {
     SAYF("  Queue      \t: %d/%d\n", stats.queue_idx, stats.queue_size);
     SAYF("  Stage      \t: %-10s\n", stats.stage.c_str());
     SAYF("  Cycles     \t: %d\n", stats.cycles);
+    SAYF("  Edges      \t: %d\n", stats.queued_with_cov);
+    SAYF("  Crashes    \t: %d\n", stats.total_crashes);
+    SAYF("  UniqCrashes\t: %d\n", stats.uniq_crashes);
     SAYF(H10 " Network " H10 "\n");
     SAYF("  Branches   \t: %d\n", stats.uncovered_branches);
     SAYF("  InputSize  \t: %d\n", stats.input_size);
