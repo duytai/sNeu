@@ -89,6 +89,7 @@ void TestSuite::compute_branch_loss(vector<TestCase>& testcases) {
 vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
 
   set<u8> losses;
+  auto tensorU8 = torch::TensorOptions().dtype(torch::kUInt8);
   vector<torch::Tensor> xs, ys, mixed_xs;
   vector<TestCase> tcs;
   auto& stats = this->fuzzer->stats;
@@ -102,12 +103,11 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
   }
   if (!max_len) return tcs; 
 
-  auto options = torch::TensorOptions().dtype(torch::kUInt8);
   stats.input_size = max_len;
   for (auto t : testcases) {
     torch::Tensor x = torch::zeros(max_len);
     torch::Tensor y = torch::zeros(1);
-    x.slice(0, 0, t.buffer.size()) = torch::from_blob(t.buffer.data(), t.buffer.size(), options);
+    x.slice(0, 0, t.buffer.size()) = torch::from_blob(t.buffer.data(), t.buffer.size(), tensorU8);
     x = x / 255.0;
     y[0] = t.min_loss / 255.0;
     xs.push_back(x);
@@ -139,27 +139,23 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
       if (half_size > 0) {
         u32 delete_from = half_size + random() % half_size;
         auto off = torch::zeros(max_len);
-        for (u32 j = 0; j < delete_from; j += 1) {
-          off[j] = (u8) buff[j] / 255.0;
-        }
+        off.slice(0, 0, delete_from) = torch::from_blob(buff.data(), delete_from, tensorU8);
+        off = off / 255.0;
         mixed_xs.push_back(off);
       }
     }
   }
 
   /* Splicing */
-  if (testcases.size() > 2) {
-    for (u32 i = 0; i < testcases.size(); i += 1) {
-      u32 j = random() % testcases.size();
+  if (xs.size() > 2) {
+    for (u32 i = 0; i < xs.size(); i += 1) {
+      u32 j = random() % xs.size();
       while (j == i) {
-        j = random() % testcases.size();
+        j = random() % xs.size();
       }
-      auto buff_0 = testcases[i].buffer; 
-      auto buff_1 = testcases[j].buffer;
-      auto min_len = min(buff_0.size(), buff_1.size());
       s32 f_diff = -1, l_diff = -1;
-      for (u32 loc = 0; loc < min_len; loc += 1) {
-        if (buff_0[loc] != buff_1[loc]) {
+      for (u32 loc = 0; loc < max_len; loc += 1) {
+        if (xs[i][loc].item<float>() != xs[j][loc].item<float>()) {
           if (f_diff == -1) f_diff = loc;
           l_diff = loc;
         }
@@ -170,29 +166,17 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
       torch::Tensor off_0 = torch::zeros(max_len);
       torch::Tensor off_1 = torch::zeros(max_len);
 
-      for (u32 i = 0; i < max_len; i += 1) {
-        /* Create first offspring */
-        if (i < buff_1.size()) {
-          if (i < split_at) {
-            off_0[i] = (u8) buff_0[i] / 255.0;
-          } else {
-            off_0[i] = (u8) buff_1[i] / 255.0;
-          }
-        }
-        /* Create second offspring */
-        if (i < buff_0.size()) {
-          if (i < split_at) {
-            off_1[i] = (u8) buff_1[i] / 255.0;
-          } else {
-            off_1[i] = (u8) buff_0[i] / 255.0;
-          }
-        }
-      }
+      off_0.slice(0, 0, split_at) = xs[i].slice(0, 0, split_at);
+      off_0.slice(0, split_at, max_len - split_at) = xs[j].slice(0, split_at, max_len - split_at);
+
+      off_1.slice(0, 0, split_at) = xs[j].slice(0, 0, split_at);
+      off_1.slice(0, split_at, max_len - split_at) = xs[i].slice(0, split_at, max_len - split_at);
 
       mixed_xs.push_back(off_0);
       mixed_xs.push_back(off_1);
     }
   }
+
   /* Append mixed_xs to xs */
   xs.insert(xs.end(), mixed_xs.begin(), mixed_xs.end());
 
@@ -202,7 +186,7 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
   for (auto x : xs) {
     x = x.clone();
     x.set_requires_grad(true);
-    for (u32 epoch = 0; epoch < 100; epoch += 1) {
+    for (u32 epoch = 0; epoch < 255; epoch += 1) {
       optimizer.zero_grad();
       torch::Tensor prediction = net->forward(x);
       torch::Tensor loss = torch::mse_loss(prediction, torch::zeros(1));
@@ -238,7 +222,7 @@ vector<TestCase> TestSuite::smart_mutate(vector<TestCase>& testcases) {
   for (auto x : xs) {
     x = x.clone();
     x.set_requires_grad(true);
-    for (u32 epoch = 0; epoch < 100; epoch += 1) {
+    for (u32 epoch = 0; epoch < 255; epoch += 1) {
       optimizer.zero_grad();
       torch::Tensor prediction = net->forward(x);
       torch::Tensor loss = torch::mse_loss(prediction, torch::zeros(1));
