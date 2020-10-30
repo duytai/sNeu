@@ -14,7 +14,7 @@ argv = sys.argv[1:] + ["-fsanitize-coverage=trace-pc-guard,trace-cmp", cmpcov]
 
 # forward to clang
 env = os.environ.copy()
-argv = ["clang"] + argv 
+argv = ["clang++"] + argv 
 p = Popen(argv, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env)
 out, err = p.communicate()
 
