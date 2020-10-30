@@ -10,5 +10,6 @@ add_executable(sneu sneu.cpp)
 include_directories(".")
 
 add_subdirectory(libfuzzer)
+add_subdirectory(libinstrument)
 
 target_link_libraries(sneu "${TORCH_LIBRARIES}" fuzzer) 
