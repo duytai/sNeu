@@ -6,22 +6,31 @@ This is a neural network assited fuzzer to efficiently generate testcases for AF
 
 - AFL  : https://github.com/google/AFL
 - Rust : https://www.rust-lang.org/tools/install
+- Libtorch: https://download.pytorch.org/libtorch/cpu/libtorch-cxx11-abi-shared-with-deps-1.2.0.zip
 - Clang/Clang++
 
 
 ### 2. Usage
 
 ```bash
-# build a lightweight fuzzer + static libraries
+# build project
+cd sNeu/
+mkdir build/ && cd build/
+CC=clang CXX=clang++ cmake -DCMAKE_PREFIX_PATH=<path/to/libtorch> ..
+
+# code instrument for projects containing CMakeLists
+cd <path/to/project>
+mkdir build && cd build/
+CC=<path/to/sNeu>/clang.py CXX=<path/to/sNeu>/clang++.py cmake ..
 make
 
-# create dirs for AFL
-mkdir in/ out/ bin/
-echo "{}" > in/1.txt
-
-# mutate testcases with Neural Network
-./sneu.py -i in/ -o out/ -b bin/ -p programs/example/
-
-# run AFL in master-slave mode
-afl-fuzz -i in/ -o out/ -M fuzzer01 bin/target_afl
+# code instrument for projects containing ./configurate
+CC=<path/to/sNeu>/clang.py CXX=<path/to/sNeu>/clang++.py ./configure
+```
+Fuzz your binary file with AFL for 1 hour and continue with sneu
+```bash
+sneu -i in -o out <path/to/binary/file>
+# in/ contains testcases under the folder queue of AFL
+# out/ is an empty folder to store test cases
+# <path/to/binary/file> syntax is similar to AFL (@@ to read from file and empty to read from stdin)
 ```
