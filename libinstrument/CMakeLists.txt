@@ -5,5 +5,4 @@ set(sources
   types.h
   hash.h
 )
-
-add_library(llvmrt ${sources})
+execute_process(COMMAND ${CC} -c ${CMAKE_CURRENT_SOURCE_DIR}/${sources} -o cmpcov.o)
