@@ -20,9 +20,8 @@ CC=clang CXX=clang++ cmake -DCMAKE_PREFIX_PATH=<path/to/libtorch> ..
 ```
 ### 3. Code instrument for c/c++ projects
 
-bash```
+```bash
 # projects containing CMakeLists
-cd <path/to/project>
 mkdir build && cd build/
 CC=<path/to/sNeu>/clang.py CXX=<path/to/sNeu>/clang++.py cmake ..
 make
@@ -30,7 +29,9 @@ make
 # projects containing ./configurate
 CC=<path/to/sNeu>/clang.py CXX=<path/to/sNeu>/clang++.py ./configure
 ```
-Fuzz your binary file with AFL for 1 hour and continue with sneu
+### 4. Fuzz your programs with sNeu
+
+Fuzz your binary with AFL for 1 hour and continue with sneu
 ```bash
 sneu -i in -o out <path/to/binary/file>
 # in/ contains testcases under the folder queue of AFL
