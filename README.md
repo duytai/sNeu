@@ -13,18 +13,21 @@ This is a neural network assited fuzzer to efficiently generate testcases for AF
 ### 2. Usage
 
 ```bash
-# build project
+# build sNeu project
 cd sNeu/
 mkdir build/ && cd build/
 CC=clang CXX=clang++ cmake -DCMAKE_PREFIX_PATH=<path/to/libtorch> ..
+```
+### 3. Code instrument for c/c++ projects
 
-# code instrument for projects containing CMakeLists
+bash```
+# projects containing CMakeLists
 cd <path/to/project>
 mkdir build && cd build/
 CC=<path/to/sNeu>/clang.py CXX=<path/to/sNeu>/clang++.py cmake ..
 make
 
-# code instrument for projects containing ./configurate
+# projects containing ./configurate
 CC=<path/to/sNeu>/clang.py CXX=<path/to/sNeu>/clang++.py ./configure
 ```
 Fuzz your binary file with AFL for 1 hour and continue with sneu
